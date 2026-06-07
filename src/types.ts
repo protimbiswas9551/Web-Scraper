@@ -38,6 +38,8 @@ export interface ScrapingTask {
   emailSmtpUser?: string;
   emailSmtpPass?: string;
   emailSmtpSecure?: boolean;
+  emailSchedule?: ScheduleInterval;
+  emailLastSentAt?: string | null;
 
   // Cloud Storage Export Settings
   storageDeliveryEnabled?: boolean;
@@ -45,6 +47,8 @@ export interface ScrapingTask {
   storageTarget?: string; // e.g. AWS Bucket, GDrive Folder ID, Dropbox Folder Path, Custom API endpoint
   storageFormat?: 'json' | 'csv';
   storageConfigJson?: string; // Store key/secrets/tokens or headers in JSON
+  storageSchedule?: ScheduleInterval;
+  storageLastSentAt?: string | null;
 }
 
 export interface ScrapingRun {

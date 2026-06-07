@@ -389,12 +389,16 @@ function convertToCsv(data: any[]): string {
 }
 
 // Multi-provider automated data delivery dispatcher (SMTP & Cloud Storage Buckets)
-async function dispatchAutomatedDeliveries(task: ScrapingTask, run: ScrapingRun): Promise<string[]> {
+async function dispatchAutomatedDeliveries(task: ScrapingTask, run: ScrapingRun, forceFlow?: 'email' | 'storage' | 'both'): Promise<string[]> {
   const logs: string[] = [];
   logs.push(`[${new Date().toISOString()}] Initiating automated data delivery checklist...`);
 
   // 1. Recurring Email Delivery Checklist
-  if (task.emailDeliveryEnabled && task.emailRecipient) {
+  const isEmailForced = forceFlow === 'email' || forceFlow === 'both';
+  const isEmailManual = !task.emailSchedule || task.emailSchedule === 'manual';
+  const shouldProcessEmail = isEmailForced || (!forceFlow && isEmailManual);
+
+  if (shouldProcessEmail && task.emailDeliveryEnabled && task.emailRecipient) {
     const shouldSend = 
       !task.emailSendOn || 
       task.emailSendOn === "always" || 
@@ -557,7 +561,11 @@ async function dispatchAutomatedDeliveries(task: ScrapingTask, run: ScrapingRun)
   }
 
   // 2. Cloud Storage Delivery Checklist
-  if (task.storageDeliveryEnabled && task.storageProvider && task.storageTarget) {
+  const isStorageForced = forceFlow === 'storage' || forceFlow === 'both';
+  const isStorageManual = !task.storageSchedule || task.storageSchedule === 'manual';
+  const shouldProcessStorage = isStorageForced || (!forceFlow && isStorageManual);
+
+  if (shouldProcessStorage && task.storageDeliveryEnabled && task.storageProvider && task.storageTarget) {
     logs.push(`[Cloud Storage] Queueing file upload to cloud target: ${task.storageProvider.toUpperCase()}`);
     try {
       const fileBaseName = `scrape_${task.name.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()}_${run.id}`;
@@ -851,13 +859,15 @@ app.post("/api/tasks", async (req, res) => {
     emailSmtpUser,
     emailSmtpPass,
     emailSmtpSecure,
+    emailSchedule,
 
     // Cloud storage settings
     storageDeliveryEnabled,
     storageProvider,
     storageTarget,
     storageFormat,
-    storageConfigJson
+    storageConfigJson,
+    storageSchedule
   } = req.body;
   
   if (!name || !url) {
@@ -907,13 +917,17 @@ app.post("/api/tasks", async (req, res) => {
     emailSmtpUser: emailSmtpUser || "",
     emailSmtpPass: emailSmtpPass || "",
     emailSmtpSecure: !!emailSmtpSecure,
+    emailSchedule: emailSchedule || "manual",
+    emailLastSentAt: null,
 
     // Cloud storage fields
     storageDeliveryEnabled: !!storageDeliveryEnabled,
     storageProvider: storageProvider || "custom_api",
     storageTarget: storageTarget || "",
     storageFormat: storageFormat || "json",
-    storageConfigJson: storageConfigJson || ""
+    storageConfigJson: storageConfigJson || "",
+    storageSchedule: storageSchedule || "manual",
+    storageLastSentAt: null
   };
 
   db.tasks.push(newTask);
@@ -1059,32 +1073,120 @@ setInterval(() => {
   let dbModified = false;
 
   db.tasks.forEach((task) => {
-    if (!task.isActive || task.schedule === "manual" || task.status === "running") {
+    if (!task.isActive || task.status === "running") {
       return;
     }
 
-    // Determine intervals
-    let intervalMs = 0;
-    if (task.schedule === "hourly") intervalMs = 60 * 60 * 1000;
-    else if (task.schedule === "daily") intervalMs = 24 * 60 * 60 * 1000;
-    else if (task.schedule === "weekly") intervalMs = 7 * 24 * 60 * 60 * 1000;
+    // 1) Core Scraping Schedule check
+    if (task.schedule !== "manual") {
+      let intervalMs = 0;
+      if (task.schedule === "hourly") intervalMs = 60 * 60 * 1000;
+      else if (task.schedule === "daily") intervalMs = 24 * 60 * 60 * 1000;
+      else if (task.schedule === "weekly") intervalMs = 7 * 24 * 60 * 60 * 1000;
 
-    const lastRun = task.lastRunAt ? new Date(task.lastRunAt) : new Date(0);
-    const msSinceLastRun = now.getTime() - lastRun.getTime();
+      const lastRun = task.lastRunAt ? new Date(task.lastRunAt) : new Date(0);
+      const msSinceLastRun = now.getTime() - lastRun.getTime();
 
-    if (msSinceLastRun >= intervalMs) {
-      console.log(`[Scheduler] Auto-executing scheduled task: "${task.name}"`);
-      task.status = "running";
-      dbModified = true;
+      if (msSinceLastRun >= intervalMs) {
+        console.log(`[Scheduler] Auto-executing scheduled task: "${task.name}"`);
+        task.status = "running";
+        dbModified = true;
 
-      // Asynchronous run via dynamic runner
-      (async () => {
-        try {
-          await runScrapingTask(task.id);
-        } catch (err) {
-          console.error(`[Scheduler Async Error] Task ${task.name} auto-run failed:`, err);
-        }
-      })();
+        // Asynchronous run via dynamic runner
+        (async () => {
+          try {
+            await runScrapingTask(task.id);
+          } catch (err) {
+            console.error(`[Scheduler Async Error] Task ${task.name} auto-run failed:`, err);
+          }
+        })();
+      }
+    }
+
+    // 2) Scheduled Email Delivery flow check
+    if (task.emailDeliveryEnabled && task.emailSchedule && task.emailSchedule !== "manual") {
+      let intervalMs = 0;
+      if (task.emailSchedule === "hourly") intervalMs = 60 * 60 * 1000;
+      else if (task.emailSchedule === "daily") intervalMs = 24 * 60 * 60 * 1000;
+      else if (task.emailSchedule === "weekly") intervalMs = 7 * 24 * 60 * 60 * 1000;
+
+      const lastSent = task.emailLastSentAt ? new Date(task.emailLastSentAt) : new Date(0);
+      const msSinceLastSend = now.getTime() - lastSent.getTime();
+
+      if (msSinceLastSend >= intervalMs) {
+        console.log(`[Scheduler] Auto-executing scheduled EMAIL dispatch for: "${task.name}"`);
+        task.emailLastSentAt = now.toISOString();
+        dbModified = true;
+
+        (async () => {
+          try {
+            const innerDb = loadDatabase();
+            const runs = innerDb.runs.filter(r => r.taskId === task.id && r.status === "success");
+            let targetRun = runs.length > 0 ? runs[runs.length - 1] : null;
+
+            if (!targetRun) {
+              console.log(`[Scheduler EMAIL] No successful run exists for "${task.name}". Scraping first...`);
+              await runScrapingTask(task.id);
+            } else {
+              const dLogs = await dispatchAutomatedDeliveries(task, targetRun, 'email');
+              const freshDb = loadDatabase();
+              const runIdx = freshDb.runs.findIndex(r => r.id === targetRun.id);
+              if (runIdx !== -1) {
+                freshDb.runs[runIdx].deliveryLogs = [
+                  ...(freshDb.runs[runIdx].deliveryLogs || []),
+                  ...dLogs
+                ];
+                saveDatabase(freshDb);
+              }
+            }
+          } catch (err) {
+            console.error(`[Scheduler EMAIL Error] Failed:`, err);
+          }
+        })();
+      }
+    }
+
+    // 3) Scheduled Cloud Storage Export flow check
+    if (task.storageDeliveryEnabled && task.storageSchedule && task.storageSchedule !== "manual") {
+      let intervalMs = 0;
+      if (task.storageSchedule === "hourly") intervalMs = 60 * 60 * 1000;
+      else if (task.storageSchedule === "daily") intervalMs = 24 * 60 * 60 * 1000;
+      else if (task.storageSchedule === "weekly") intervalMs = 7 * 24 * 60 * 60 * 1000;
+
+      const lastSent = task.storageLastSentAt ? new Date(task.storageLastSentAt) : new Date(0);
+      const msSinceLastSend = now.getTime() - lastSent.getTime();
+
+      if (msSinceLastSend >= intervalMs) {
+        console.log(`[Scheduler] Auto-executing scheduled STORAGE upload for: "${task.name}"`);
+        task.storageLastSentAt = now.toISOString();
+        dbModified = true;
+
+        (async () => {
+          try {
+            const innerDb = loadDatabase();
+            const runs = innerDb.runs.filter(r => r.taskId === task.id && r.status === "success");
+            let targetRun = runs.length > 0 ? runs[runs.length - 1] : null;
+
+            if (!targetRun) {
+              console.log(`[Scheduler STORAGE] No successful run exists for "${task.name}". Scraping first...`);
+              await runScrapingTask(task.id);
+            } else {
+              const dLogs = await dispatchAutomatedDeliveries(task, targetRun, 'storage');
+              const freshDb = loadDatabase();
+              const runIdx = freshDb.runs.findIndex(r => r.id === targetRun.id);
+              if (runIdx !== -1) {
+                freshDb.runs[runIdx].deliveryLogs = [
+                  ...(freshDb.runs[runIdx].deliveryLogs || []),
+                  ...dLogs
+                ];
+                saveDatabase(freshDb);
+              }
+            }
+          } catch (err) {
+            console.error(`[Scheduler STORAGE Error] Failed:`, err);
+          }
+        })();
+      }
     }
   });
 

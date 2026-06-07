@@ -77,6 +77,7 @@ export default function App() {
   const [emailSmtpUser, setEmailSmtpUser] = useState("");
   const [emailSmtpPass, setEmailSmtpPass] = useState("");
   const [emailSmtpSecure, setEmailSmtpSecure] = useState(false);
+  const [emailSchedule, setEmailSchedule] = useState<ScheduleInterval>("manual");
 
   // Cloud Storage Export configuration states
   const [storageDeliveryEnabled, setStorageDeliveryEnabled] = useState(false);
@@ -84,6 +85,7 @@ export default function App() {
   const [storageTarget, setStorageTarget] = useState("");
   const [storageFormat, setStorageFormat] = useState<'json' | 'csv'>("json");
   const [storageConfigJson, setStorageConfigJson] = useState("");
+  const [storageSchedule, setStorageSchedule] = useState<ScheduleInterval>("manual");
 
   // Run detailed viewer
   const [selectedRun, setSelectedRun] = useState<ScrapingRun | null>(null);
@@ -183,12 +185,14 @@ export default function App() {
     setEmailSmtpUser("");
     setEmailSmtpPass("");
     setEmailSmtpSecure(false);
+    setEmailSchedule("manual");
 
     setStorageDeliveryEnabled(false);
     setStorageProvider("custom_api");
     setStorageTarget("");
     setStorageFormat("json");
     setStorageConfigJson("");
+    setStorageSchedule("manual");
 
     setIsTaskModalOpen(true);
   };
@@ -224,12 +228,14 @@ export default function App() {
     setEmailSmtpUser(task.emailSmtpUser || "");
     setEmailSmtpPass(task.emailSmtpPass || "");
     setEmailSmtpSecure(!!task.emailSmtpSecure);
+    setEmailSchedule(task.emailSchedule || "manual");
 
     setStorageDeliveryEnabled(!!task.storageDeliveryEnabled);
     setStorageProvider(task.storageProvider || "custom_api");
     setStorageTarget(task.storageTarget || "");
     setStorageFormat(task.storageFormat || "json");
     setStorageConfigJson(task.storageConfigJson || "");
+    setStorageSchedule(task.storageSchedule || "manual");
 
     setIsTaskModalOpen(true);
   };
@@ -277,13 +283,15 @@ export default function App() {
       emailSmtpUser,
       emailSmtpPass,
       emailSmtpSecure,
+      emailSchedule,
 
       // Cloud storage params
       storageDeliveryEnabled,
       storageProvider,
       storageTarget,
       storageFormat,
-      storageConfigJson
+      storageConfigJson,
+      storageSchedule
     };
 
     try {
@@ -1625,7 +1633,7 @@ export default function App() {
 
                     {emailDeliveryEnabled && (
                       <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3.5 space-y-3.5 mb-3.5 animate-fadeIn">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                           <div>
                             <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Recipient Inbox Email</label>
                             <input 
@@ -1661,6 +1669,20 @@ export default function App() {
                               <option value="json">JSON format list</option>
                               <option value="csv">CSV spreadsheet list</option>
                               <option value="inline_html">Inline preview HTML table</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Delivery Schedule</label>
+                            <select
+                              value={emailSchedule}
+                              onChange={(e) => setEmailSchedule(e.target.value as any)}
+                              className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none font-medium"
+                            >
+                              <option value="manual">Manual (Upon scrape complete)</option>
+                              <option value="hourly">Hourly (0 * * * *)</option>
+                              <option value="daily">Daily (0 0 * * *)</option>
+                              <option value="weekly">Weekly (0 0 * * 0)</option>
                             </select>
                           </div>
                         </div>
@@ -1757,7 +1779,7 @@ export default function App() {
 
                     {storageDeliveryEnabled && (
                       <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3.5 animate-fadeIn">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                           <div>
                             <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Cloud Target Registry</label>
                             <select
@@ -1785,7 +1807,7 @@ export default function App() {
                               }
                               value={storageTarget}
                               onChange={(e) => setStorageTarget(e.target.value)}
-                              className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none font-mono"
+                              className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none font-mono font-medium"
                             />
                           </div>
 
@@ -1798,6 +1820,20 @@ export default function App() {
                             >
                               <option value="json">JSON format</option>
                               <option value="csv">CSV spreadsheet</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Upload Schedule</label>
+                            <select
+                              value={storageSchedule}
+                              onChange={(e) => setStorageSchedule(e.target.value as any)}
+                              className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none font-medium"
+                            >
+                              <option value="manual">Manual (Upon scrape complete)</option>
+                              <option value="hourly">Hourly (0 * * * *)</option>
+                              <option value="daily">Daily (0 0 * * *)</option>
+                              <option value="weekly">Weekly (0 0 * * 0)</option>
                             </select>
                           </div>
                         </div>
