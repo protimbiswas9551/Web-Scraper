@@ -1530,7 +1530,7 @@ export default function App() {
                   {isSaving ? (
                     <>
                       <Loader2 className="animate-spin text-white" size={13} />
-                      <span>Saving parameters...</span>
+                      <span>Verifying reachability & saving...</span>
                     </>
                   ) : (
                     <span>{editingTask ? "Apply Changes" : "Save Scraper Profile"}</span>

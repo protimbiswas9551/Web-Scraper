@@ -435,6 +435,44 @@ async function runScrapingTask(taskId: string): Promise<ScrapingRun> {
   return newRun;
 }
 
+// Quick reachability validator for target URLs
+async function checkUrlReachability(url: string): Promise<{ reachable: boolean; error?: string }> {
+  let formattedUrl = url.trim();
+  if (!/^https?:\/\//i.test(formattedUrl)) {
+    formattedUrl = "https://" + formattedUrl;
+  }
+
+  try {
+    new URL(formattedUrl);
+  } catch (e) {
+    return { reachable: false, error: "The provided URL structure is invalid." };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 seconds timeout limit
+
+    const res = await fetch(formattedUrl, {
+      method: "GET",
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+      },
+    });
+    clearTimeout(timeoutId);
+    return { reachable: true };
+  } catch (err: any) {
+    let errorDescription = "Network connection failed, domain name not found, or destination server is offline.";
+    if (err.name === "AbortError") {
+      errorDescription = "Destination reachability check timed out (server took more than 6s to respond).";
+    } else if (err.message) {
+      errorDescription = err.message;
+    }
+    return { reachable: false, error: errorDescription };
+  }
+}
+
 // ==========================================
 // API Endpoints
 // ==========================================
@@ -446,7 +484,7 @@ app.get("/api/tasks", (req, res) => {
 });
 
 // Create task with full parameters list support
-app.post("/api/tasks", (req, res) => {
+app.post("/api/tasks", async (req, res) => {
   const { 
     name, 
     url, 
@@ -467,6 +505,13 @@ app.post("/api/tasks", (req, res) => {
   
   if (!name || !url) {
     res.status(400).json({ error: "Task Name and Target URL are required." });
+    return;
+  }
+
+  // URL Reachability check validator
+  const reachCheck = await checkUrlReachability(url);
+  if (!reachCheck.reachable) {
+    res.status(400).json({ error: `Provided Target URL is unreachable: ${reachCheck.error}` });
     return;
   }
 
@@ -502,7 +547,7 @@ app.post("/api/tasks", (req, res) => {
 });
 
 // Update task
-app.put("/api/tasks/:id", (req, res) => {
+app.put("/api/tasks/:id", async (req, res) => {
   const { id } = req.params;
   const updates = req.body;
 
@@ -512,6 +557,15 @@ app.put("/api/tasks/:id", (req, res) => {
   if (taskIdx === -1) {
     res.status(404).json({ error: "Scraping task not found." });
     return;
+  }
+
+  // URL Reachability check validator on URL change
+  if (updates.url && updates.url !== db.tasks[taskIdx].url) {
+    const reachCheck = await checkUrlReachability(updates.url);
+    if (!reachCheck.reachable) {
+      res.status(400).json({ error: `Provided Target URL is unreachable: ${reachCheck.error}` });
+      return;
+    }
   }
 
   db.tasks[taskIdx] = {
