@@ -27,6 +27,24 @@ export interface ScrapingTask {
   // Automation & Delivery Workflow
   webhookUrl?: string;
   chainTaskId?: string;
+
+  // Recurring Email Delivery Settings
+  emailDeliveryEnabled?: boolean;
+  emailRecipient?: string;
+  emailSendOn?: 'always' | 'success' | 'failed';
+  emailFormat?: 'json' | 'csv' | 'inline_html';
+  emailSmtpHost?: string;
+  emailSmtpPort?: number;
+  emailSmtpUser?: string;
+  emailSmtpPass?: string;
+  emailSmtpSecure?: boolean;
+
+  // Cloud Storage Export Settings
+  storageDeliveryEnabled?: boolean;
+  storageProvider?: 'aws_s3' | 'google_drive' | 'dropbox' | 'custom_api';
+  storageTarget?: string; // e.g. AWS Bucket, GDrive Folder ID, Dropbox Folder Path, Custom API endpoint
+  storageFormat?: 'json' | 'csv';
+  storageConfigJson?: string; // Store key/secrets/tokens or headers in JSON
 }
 
 export interface ScrapingRun {
@@ -39,6 +57,7 @@ export interface ScrapingRun {
   errorMessage: string | null;
   data: any[]; // Extracted row items
   rawHtmlSample?: string; // Truncated HTML for preview
+  deliveryLogs?: string[]; // Auditing traces of background email & cloud uploads
 }
 
 export interface ExportFormat {

@@ -25,7 +25,10 @@ import {
   Clock,
   Sliders,
   FileJson,
-  Layers
+  Layers,
+  Mail,
+  Cloud,
+  Lock
 } from "lucide-react";
 import { ScrapingTask, ScrapingRun, ExtractionType, ScheduleInterval } from "./types";
 import { StatsSection } from "./components/StatsSection";
@@ -63,6 +66,24 @@ export default function App() {
   const [proxyAddress, setProxyAddress] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [chainTaskId, setChainTaskId] = useState("");
+
+  // Recurring Email Delivery configuration states
+  const [emailDeliveryEnabled, setEmailDeliveryEnabled] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState("");
+  const [emailSendOn, setEmailSendOn] = useState<'always' | 'success' | 'failed'>("always");
+  const [emailFormat, setEmailFormat] = useState<'json' | 'csv' | 'inline_html'>("json");
+  const [emailSmtpHost, setEmailSmtpHost] = useState("");
+  const [emailSmtpPort, setEmailSmtpPort] = useState<number>(587);
+  const [emailSmtpUser, setEmailSmtpUser] = useState("");
+  const [emailSmtpPass, setEmailSmtpPass] = useState("");
+  const [emailSmtpSecure, setEmailSmtpSecure] = useState(false);
+
+  // Cloud Storage Export configuration states
+  const [storageDeliveryEnabled, setStorageDeliveryEnabled] = useState(false);
+  const [storageProvider, setStorageProvider] = useState<'aws_s3' | 'google_drive' | 'dropbox' | 'custom_api'>("custom_api");
+  const [storageTarget, setStorageTarget] = useState("");
+  const [storageFormat, setStorageFormat] = useState<'json' | 'csv'>("json");
+  const [storageConfigJson, setStorageConfigJson] = useState("");
 
   // Run detailed viewer
   const [selectedRun, setSelectedRun] = useState<ScrapingRun | null>(null);
@@ -152,6 +173,23 @@ export default function App() {
     setWebhookUrl("");
     setChainTaskId("");
 
+    // Delivery resets
+    setEmailDeliveryEnabled(false);
+    setEmailRecipient("");
+    setEmailSendOn("always");
+    setEmailFormat("json");
+    setEmailSmtpHost("");
+    setEmailSmtpPort(587);
+    setEmailSmtpUser("");
+    setEmailSmtpPass("");
+    setEmailSmtpSecure(false);
+
+    setStorageDeliveryEnabled(false);
+    setStorageProvider("custom_api");
+    setStorageTarget("");
+    setStorageFormat("json");
+    setStorageConfigJson("");
+
     setIsTaskModalOpen(true);
   };
 
@@ -175,6 +213,23 @@ export default function App() {
     setProxyAddress(task.proxyAddress || "");
     setWebhookUrl(task.webhookUrl || "");
     setChainTaskId(task.chainTaskId || "");
+
+    // Load saved delivery parameters
+    setEmailDeliveryEnabled(!!task.emailDeliveryEnabled);
+    setEmailRecipient(task.emailRecipient || "");
+    setEmailSendOn(task.emailSendOn || "always");
+    setEmailFormat(task.emailFormat || "json");
+    setEmailSmtpHost(task.emailSmtpHost || "");
+    setEmailSmtpPort(task.emailSmtpPort || 587);
+    setEmailSmtpUser(task.emailSmtpUser || "");
+    setEmailSmtpPass(task.emailSmtpPass || "");
+    setEmailSmtpSecure(!!task.emailSmtpSecure);
+
+    setStorageDeliveryEnabled(!!task.storageDeliveryEnabled);
+    setStorageProvider(task.storageProvider || "custom_api");
+    setStorageTarget(task.storageTarget || "");
+    setStorageFormat(task.storageFormat || "json");
+    setStorageConfigJson(task.storageConfigJson || "");
 
     setIsTaskModalOpen(true);
   };
@@ -210,7 +265,25 @@ export default function App() {
       delaySecs,
       proxyAddress,
       webhookUrl,
-      chainTaskId
+      chainTaskId,
+
+      // Email notification params
+      emailDeliveryEnabled,
+      emailRecipient,
+      emailSendOn,
+      emailFormat,
+      emailSmtpHost,
+      emailSmtpPort,
+      emailSmtpUser,
+      emailSmtpPass,
+      emailSmtpSecure,
+
+      // Cloud storage params
+      storageDeliveryEnabled,
+      storageProvider,
+      storageTarget,
+      storageFormat,
+      storageConfigJson
     };
 
     try {
@@ -911,6 +984,28 @@ export default function App() {
                       <span>UTF-8 Encoding Active</span>
                     </div>
 
+                    {/* AUTOMATED DELIVERIES TRACE AUDIT LOGBOOK */}
+                    {selectedRun.deliveryLogs && selectedRun.deliveryLogs.length > 0 && (
+                      <div className="bg-slate-950 border-t border-slate-800 p-4 font-mono text-[10.5px] text-slate-300">
+                        <div className="flex items-center gap-1.5 text-slate-100 font-bold mb-2 text-[11px] tracking-wide uppercase">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                          <span>📦 Automatic Delivery Audit Logs</span>
+                        </div>
+                        <div className="max-h-[140px] overflow-y-auto space-y-1.5 scrollbar-thin pr-2 scrollbar-track-slate-900 scrollbar-thumb-slate-700">
+                          {selectedRun.deliveryLogs.map((logLine, lIdx) => {
+                            let isErr = logLine.includes("Error") || logLine.includes("Failed") || logLine.includes("negative");
+                            let isSuccess = logLine.includes("Success!") || logLine.includes("successful") || logLine.includes("dispatched") || logLine.includes("Dropbox upload successful") || logLine.includes("Drive Success!");
+                            let colorClass = isErr ? "text-rose-450 font-semibold" : isSuccess ? "text-emerald-400" : "text-slate-350";
+                            return (
+                              <div key={lIdx} className={`leading-tight ${colorClass}`}>
+                                {logLine}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 ) : (
                   <div className="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-xs">
@@ -1507,6 +1602,225 @@ export default function App() {
                           ))}
                       </select>
                     </div>
+                  </div>
+
+                  {/* RECURRING EMAIL DELIVERY */}
+                  <div className="border-t border-slate-100 pt-4 mt-3">
+                    <div className="flex items-center justify-between mb-3.5">
+                      <h4 className="text-xs font-bold text-slate-905 tracking-wider uppercase flex items-center gap-1.5 text-blue-650 font-sans">
+                        <Mail size={12} className="text-blue-500" />
+                        <span>📧 Scheduled Email Delivery</span>
+                      </h4>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={emailDeliveryEnabled}
+                          onChange={(e) => setEmailDeliveryEnabled(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-8 h-4 bg-slate-200 rounded-full peer peer-focus:ring-0 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                        <span className="ml-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider leading-none">Enable</span>
+                      </label>
+                    </div>
+
+                    {emailDeliveryEnabled && (
+                      <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3.5 space-y-3.5 mb-3.5 animate-fadeIn">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Recipient Inbox Email</label>
+                            <input 
+                              type="email" 
+                              required
+                              placeholder="e.g. hello@example.com"
+                              value={emailRecipient}
+                              onChange={(e) => setEmailRecipient(e.target.value)}
+                              className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Notify On Trigger</label>
+                            <select
+                              value={emailSendOn}
+                              onChange={(e) => setEmailSendOn(e.target.value as any)}
+                              className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none font-medium"
+                            >
+                              <option value="always">Always notify</option>
+                              <option value="success">On Success only</option>
+                              <option value="failed">On Failure only</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Attachment Format</label>
+                            <select
+                              value={emailFormat}
+                              onChange={(e) => setEmailFormat(e.target.value as any)}
+                              className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none font-medium"
+                            >
+                              <option value="json">JSON format list</option>
+                              <option value="csv">CSV spreadsheet list</option>
+                              <option value="inline_html">Inline preview HTML table</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* SMTP configure expander */}
+                        <details className="group border-t border-blue-100/40 pt-2.5">
+                          <summary className="flex items-center gap-1 text-[10px] font-bold text-blue-900 cursor-pointer select-none">
+                            <span className="transition-transform group-open:rotate-90">▸</span>
+                            Custom SMTP Server Mailbox Settings (Optional)
+                          </summary>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-3">
+                            <div className="md:col-span-2">
+                              <label className="block text-[9.5px] font-bold text-slate-500 mb-1 uppercase tracking-wider">SMTP Server Host</label>
+                              <input 
+                                type="text" 
+                                placeholder="e.g. smtp.gmail.com"
+                                value={emailSmtpHost}
+                                onChange={(e) => setEmailSmtpHost(e.target.value)}
+                                className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none font-mono"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[9.5px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Port</label>
+                              <input 
+                                type="number" 
+                                placeholder="e.g. 587"
+                                value={emailSmtpPort || ""}
+                                onChange={(e) => setEmailSmtpPort(Number(e.target.value))}
+                                className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none"
+                              />
+                            </div>
+
+                            <div className="flex items-center pt-5">
+                              <label className="flex items-center space-x-2 text-xs font-semibold text-slate-650 cursor-pointer">
+                                <input 
+                                  type="checkbox" 
+                                  checked={emailSmtpSecure}
+                                  onChange={(e) => setEmailSmtpSecure(e.target.checked)}
+                                  className="rounded border-slate-300 text-blue-600 focus:ring-0"
+                                />
+                                <span>SSL / TLS Encrypt</span>
+                              </label>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3">
+                            <div>
+                              <label className="block text-[9.5px] font-bold text-slate-500 mb-1 uppercase tracking-wider">SMTP Signed Account</label>
+                              <input 
+                                type="text" 
+                                placeholder="e.g. notifications@yourdomain.com"
+                                value={emailSmtpUser}
+                                onChange={(e) => setEmailSmtpUser(e.target.value)}
+                                className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[9.5px] font-bold text-slate-500 mb-1 uppercase tracking-wider">SMTP Secure Password</label>
+                              <input 
+                                type="password" 
+                                placeholder="••••••••••••"
+                                value={emailSmtpPass}
+                                onChange={(e) => setEmailSmtpPass(e.target.value)}
+                                className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none font-mono"
+                              />
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* COGNITIVE CLOUD STORAGE EXPORT */}
+                  <div className="border-t border-slate-100 pt-4 mt-3">
+                    <div className="flex items-center justify-between mb-3.5">
+                      <h4 className="text-xs font-bold text-slate-905 tracking-wider uppercase flex items-center gap-1.5 text-blue-650 font-sans">
+                        <Cloud size={12} className="text-blue-500" />
+                        <span>☁️ Cloud Storage Delivery</span>
+                      </h4>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={storageDeliveryEnabled}
+                          onChange={(e) => setStorageDeliveryEnabled(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-8 h-4 bg-slate-200 rounded-full peer peer-focus:ring-0 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                        <span className="ml-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider leading-none">Enable</span>
+                      </label>
+                    </div>
+
+                    {storageDeliveryEnabled && (
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3.5 animate-fadeIn">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Cloud Target Registry</label>
+                            <select
+                              value={storageProvider}
+                              onChange={(e) => setStorageProvider(e.target.value as any)}
+                              className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none font-medium"
+                            >
+                              <option value="custom_api">Custom Endpoint (REST HTTP POST)</option>
+                              <option value="google_drive">Google Drive Workspace GFolder</option>
+                              <option value="dropbox">Dropbox Folder Directory</option>
+                              <option value="aws_s3">AWS S3 Compatible Bucket</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Target Folder / URL Endpoint</label>
+                            <input 
+                              type="text" 
+                              required
+                              placeholder={
+                                storageProvider === 'aws_s3' ? 'my-aws-s3-bucket-name' :
+                                storageProvider === 'dropbox' ? '/Scraped/Reports' :
+                                storageProvider === 'google_drive' ? 'folder-shares-id-abc' :
+                                'https://api.mycloud.com/scraper/v1/hook'
+                              }
+                              value={storageTarget}
+                              onChange={(e) => setStorageTarget(e.target.value)}
+                              className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none font-mono"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Document Format</label>
+                            <select
+                              value={storageFormat}
+                              onChange={(e) => setStorageFormat(e.target.value as any)}
+                              className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2 focus:border-blue-500 outline-none font-medium"
+                            >
+                              <option value="json">JSON format</option>
+                              <option value="csv">CSV spreadsheet</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">
+                            Authorization Parameters / Token Headers (Config JSON object)
+                          </label>
+                          <textarea
+                            rows={2}
+                            placeholder={
+                              storageProvider === 'dropbox' ? '{\n  "accessToken": "dbx-your-api-long-lived-token"\n}' :
+                              storageProvider === 'google_drive' ? '{\n  "token": "google-drive-oauth-bearer-token"\n}' :
+                              storageProvider === 'custom_api' ? '{\n  "headers": {\n    "Authorization": "Bearer x-y-z",\n    "X-Source": "crawlers"\n  }\n}' :
+                              '{\n  "accessKeyId": "AKIA...",\n  "secretAccessKey": "...",\n  "region": "us-east-1"\n}'
+                            }
+                            value={storageConfigJson}
+                            onChange={(e) => setStorageConfigJson(e.target.value)}
+                            className="w-full text-[11px] border border-slate-220 bg-white rounded-lg p-2.5 focus:border-blue-500 outline-none font-mono"
+                          ></textarea>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                 </div>
