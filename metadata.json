@@ -1,0 +1,6 @@
+{
+  "name": "Web Scraper Dashboard",
+  "description": "An intuitive scraper and scheduler dashboard that extracts website content and exports to CSV or JSON formats, powered by Gemini AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
