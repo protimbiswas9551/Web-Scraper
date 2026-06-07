@@ -14,6 +14,19 @@ export interface ScrapingTask {
   lastRunAt: string | null;
   status: TaskStatus;
   isActive: boolean; // For schedule enabled/disabled
+
+  // Anti-Bot & Request Settings
+  jsRendering?: boolean;
+  userAgentMode?: 'standard' | 'mobile' | 'googlebot' | 'custom';
+  customUserAgent?: string;
+  headersJson?: string;
+  cookieSession?: string;
+  delaySecs?: number;
+  proxyAddress?: string;
+
+  // Automation & Delivery Workflow
+  webhookUrl?: string;
+  chainTaskId?: string;
 }
 
 export interface ScrapingRun {

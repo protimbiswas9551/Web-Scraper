@@ -207,28 +207,114 @@ ${cleanHtml}`,
   }
 }
 
-// Core execution engine
-async function executeScrape(url: string, type: ExtractionType, instruction: string): Promise<any[]> {
+// Core execution engine with bypass settings
+async function executeScrape(
+  url: string,
+  type: ExtractionType,
+  instruction: string,
+  task?: Partial<ScrapingTask>
+): Promise<any[]> {
   // Format URL nicely
   let formattedUrl = url.trim();
   if (!/^https?:\/\//i.test(formattedUrl)) {
     formattedUrl = "https://" + formattedUrl;
   }
 
+  // 1. Politeness Throttling Delay Simulation
+  if (task?.delaySecs && task.delaySecs > 0) {
+    console.log(`[Throttler] Sleep period active. Awaiting politeness delay: ${task.delaySecs} seconds...`);
+    await new Promise((resolve) => setTimeout(resolve, task.delaySecs! * 1000));
+  }
+
+  const requestHeaders: Record<string, string> = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+  };
+
+  // 2. User Agent Selection (Bypassing anti-bot signatures)
+  if (task?.userAgentMode === "mobile") {
+    requestHeaders["User-Agent"] = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1";
+  } else if (task?.userAgentMode === "googlebot") {
+    requestHeaders["User-Agent"] = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
+  } else if (task?.userAgentMode === "custom" && task.customUserAgent) {
+    requestHeaders["User-Agent"] = task.customUserAgent;
+  } else {
+    requestHeaders["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+  }
+
+  // 3. Custom simulated proxy/routing headers
+  if (task?.proxyAddress) {
+    console.log(`[Proxy Routing] Directing fetch tunnel: ${task.proxyAddress}`);
+    requestHeaders["X-Simulated-Proxy-Address"] = task.proxyAddress;
+  }
+
+  // 4. Session Cookies Setup
+  if (task?.cookieSession) {
+    requestHeaders["Cookie"] = task.cookieSession;
+  }
+
+  // 5. Custom headers override
+  if (task?.headersJson) {
+    try {
+      const customOnes = JSON.parse(task.headersJson);
+      Object.assign(requestHeaders, customOnes);
+    } catch (e) {
+      console.warn("Could not parse headersJson configuration:", e);
+    }
+  }
+
   // Fetch target web pages
   const res = await fetch(formattedUrl, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.5",
-    },
+    headers: requestHeaders,
   });
 
   if (!res.ok) {
-    throw new Error(`Failed to download website header. Server returned HTTP ${res.status}`);
+    throw new Error(`Failed to download website data. Server returned HTTP Status ${res.status}`);
   }
 
-  const html = await res.text();
+  let html = await res.text();
+
+  // 6. Handle Dynamic content rendering simulator (JS hydration recovery)
+  if (task?.jsRendering) {
+    console.log("[JS Rendering Engine] Parsing hydratable script frames & JSON blocks for content expansion...");
+    const $ = cheerio.load(html);
+    let unpackingCount = 0;
+
+    // Expand Next.js Static states
+    const nextDataEl = $("#__NEXT_DATA__");
+    if (nextDataEl.length > 0) {
+      try {
+        const parsedNode = JSON.parse(nextDataEl.text().trim());
+        if (parsedNode.props && parsedNode.props.pageProps) {
+          const flatNodeData = JSON.stringify(parsedNode.props.pageProps);
+          console.log("[JS Simulator] NextJS Hydration frame resolved.");
+          $("body").append(`<div id="js-virtual-hydration" data-unpack="true" style="display:none">${flatNodeData}</div>`);
+          unpackingCount++;
+        }
+      } catch (err) {
+        console.warn("Could not digest standard NextJS state script tags:", err);
+      }
+    }
+
+    // Expand other script variables (Nuxt, Remix, window.APP_DATA, or simple custom globals)
+    $("script").each((_, scriptEl) => {
+      const textVal = $(scriptEl).text();
+      if (textVal.includes("__INITIAL_STATE__") || textVal.includes("window.APP_DATA") || textVal.includes("window.__remixContext")) {
+        try {
+          const matched = textVal.match(/(?:window\.[_A-Z0-9]+|__INITIAL_STATE__|__remixContext)\s*=\s*({[\s\S]+?});?/i);
+          if (matched && matched[1]) {
+            const unpackedData = JSON.parse(matched[1]);
+            $("body").append(`<div id="js-virtual-remix" data-unpack="true" style="display:none">${JSON.stringify(unpackedData)}</div>`);
+            unpackingCount++;
+          }
+        } catch (e) {}
+      }
+    });
+
+    if (unpackingCount > 0) {
+      html = $.html();
+    }
+  }
 
   if (type === "selector") {
     if (!instruction) {
@@ -236,7 +322,7 @@ async function executeScrape(url: string, type: ExtractionType, instruction: str
     }
     const data = cheerioExtract(html, instruction);
     if (data.length === 0) {
-      throw new Error(`Cheerio scrape yielded 0 rows. CSS selector "${instruction}" was not found or is dynamic on this page.`);
+      throw new Error(`Cheerio scrape yielded 0 rows. CSS selector "${instruction}" was not found or is dynamic on this page. Try enabling JS simulation rendering mode.`);
     }
     return data;
   } else {
@@ -245,6 +331,108 @@ async function executeScrape(url: string, type: ExtractionType, instruction: str
     }
     return await geminiExtract(html, instruction);
   }
+}
+
+// Shared webhook dispatcher
+async function fireWebhook(url: string, run: ScrapingRun) {
+  try {
+    console.log(`[Webhook Delivery] Triggering callback endpoint: ${url}`);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Crawl-Source": "ScrapeFlow-Engine"
+      },
+      body: JSON.stringify({
+        event: run.status === "success" ? "scrape.success" : "scrape.failed",
+        runId: run.id,
+        taskId: run.taskId,
+        taskName: run.taskName,
+        status: run.status,
+        timestamp: run.runAt,
+        resultsCount: run.resultsCount,
+        error: run.errorMessage,
+        data: run.data,
+      }),
+    });
+    console.log(`[Webhook Delivery] Target URL returned HTTP status: ${response.status}`);
+  } catch (err: any) {
+    console.error(`[Webhook Delivery Error] Delivery failed for URL ${url}:`, err.message);
+  }
+}
+
+// Unified task scraper runner
+async function runScrapingTask(taskId: string): Promise<ScrapingRun> {
+  const runId = Date.now().toString();
+  const runAt = new Date().toISOString();
+  let scrapingResults: any[] = [];
+  let scraperStatus: "success" | "failed" = "success";
+  let errmsg: string | null = null;
+  let taskCopy: ScrapingTask | null = null;
+
+  // 1. Mark status as running
+  const initDb = loadDatabase();
+  const tIdx = initDb.tasks.findIndex((t) => t.id === taskId);
+  if (tIdx !== -1) {
+    initDb.tasks[tIdx].status = "running";
+    taskCopy = initDb.tasks[tIdx];
+    saveDatabase(initDb);
+  } else {
+    throw new Error("Target scraping task was not found to execute.");
+  }
+
+  // 2. Perform raw HTTP crawl + dynamic simulation + select extraction
+  try {
+    const instruction = taskCopy.extractionType === "selector" ? (taskCopy.selector || "") : (taskCopy.prompt || "");
+    scrapingResults = await executeScrape(taskCopy.url, taskCopy.extractionType, instruction, taskCopy);
+  } catch (err: any) {
+    scraperStatus = "failed";
+    errmsg = err.message || "An unexpected scraper parser error occurred.";
+    console.error(`[Scraper Thread] Scraper task execution "${taskCopy.name}" (${taskId}) failed:`, errmsg);
+  }
+
+  // 3. Save resulting ScrapingRun and update Task details
+  const finalDb = loadDatabase();
+  const finalTIdx = finalDb.tasks.findIndex((t) => t.id === taskId);
+  if (finalTIdx !== -1) {
+    finalDb.tasks[finalTIdx].status = scraperStatus === "success" ? "success" : "failed";
+    finalDb.tasks[finalTIdx].lastRunAt = runAt;
+  }
+
+  const newRun: ScrapingRun = {
+    id: runId,
+    taskId: taskCopy.id,
+    taskName: taskCopy.name,
+    runAt,
+    status: scraperStatus,
+    resultsCount: scrapingResults.length,
+    errorMessage: errmsg,
+    data: scrapingResults,
+  };
+
+  finalDb.runs.push(newRun);
+  saveDatabase(finalDb);
+
+  // 4. Automation hook triggers in background
+  if (taskCopy.webhookUrl) {
+    // Fire webhook asynchronously
+    fireWebhook(taskCopy.webhookUrl, newRun).catch(e => {
+       console.error("Webhook promise logging fallback failure:", e);
+    });
+  }
+
+  if (taskCopy.chainTaskId && scraperStatus === "success") {
+    const chainTargetId = taskCopy.chainTaskId;
+    console.log(`[Workflow Chainer] Scraper "${taskCopy.name}" completed. Auto-igniting chained scraper ID: ${chainTargetId}`);
+    // Run chained task asynchronously
+    setTimeout(() => {
+      runScrapingTask(chainTargetId).catch((err) => {
+        console.error(`[Workflow Chainer Error] Failed to execute scheduled chain action for ${chainTargetId}:`, err);
+      });
+    }, 1000);
+  }
+
+  return newRun;
 }
 
 // ==========================================
@@ -257,9 +445,25 @@ app.get("/api/tasks", (req, res) => {
   res.json(db.tasks);
 });
 
-// Create task
+// Create task with full parameters list support
 app.post("/api/tasks", (req, res) => {
-  const { name, url, extractionType, selector, prompt, schedule } = req.body;
+  const { 
+    name, 
+    url, 
+    extractionType, 
+    selector, 
+    prompt, 
+    schedule,
+    jsRendering,
+    userAgentMode,
+    customUserAgent,
+    headersJson,
+    cookieSession,
+    delaySecs,
+    proxyAddress,
+    webhookUrl,
+    chainTaskId
+  } = req.body;
   
   if (!name || !url) {
     res.status(400).json({ error: "Task Name and Target URL are required." });
@@ -279,6 +483,17 @@ app.post("/api/tasks", (req, res) => {
     lastRunAt: null,
     status: "idle",
     isActive: true,
+
+    // Advanced features
+    jsRendering: !!jsRendering,
+    userAgentMode: userAgentMode || "standard",
+    customUserAgent: customUserAgent || "",
+    headersJson: headersJson || "",
+    cookieSession: cookieSession || "",
+    delaySecs: typeof delaySecs === "number" ? delaySecs : 0,
+    proxyAddress: proxyAddress || "",
+    webhookUrl: webhookUrl || "",
+    chainTaskId: chainTaskId || "",
   };
 
   db.tasks.push(newTask);
@@ -359,47 +574,29 @@ app.post("/api/tasks/:id/run", async (req, res) => {
   res.json({ message: "Scraping task initiated successfully.", task });
 
   (async () => {
-    const runId = Date.now().toString();
-    const runAt = new Date().toISOString();
-    let scrapingResults: any[] = [];
-    let scraperStatus: "success" | "failed" = "success";
-    let errmsg: string | null = null;
-
     try {
-      const instruction = task.extractionType === "selector" ? (task.selector || "") : (task.prompt || "");
-      scrapingResults = await executeScrape(task.url, task.extractionType, instruction);
-    } catch (err: any) {
-      scraperStatus = "failed";
-      errmsg = err.message || "An unknown scraping error occurred.";
-      console.error(`Task ${task.name} execution failed:`, errmsg);
+      await runScrapingTask(id);
+    } catch (err) {
+      console.error("[Async Manual Trigger] Execution failed:", err);
     }
-
-    const completedDb = loadDatabase();
-    const updatedTaskIdx = completedDb.tasks.findIndex((t) => t.id === id);
-    if (updatedTaskIdx !== -1) {
-      completedDb.tasks[updatedTaskIdx].status = scraperStatus === "success" ? "success" : "failed";
-      completedDb.tasks[updatedTaskIdx].lastRunAt = runAt;
-    }
-
-    const newRun: ScrapingRun = {
-      id: runId,
-      taskId: task.id,
-      taskName: task.name,
-      runAt,
-      status: scraperStatus,
-      resultsCount: scrapingResults.length,
-      errorMessage: errmsg,
-      data: scrapingResults,
-    };
-
-    completedDb.runs.push(newRun);
-    saveDatabase(completedDb);
   })();
 });
 
-// Test query scraper for sandbox previews
+// Test query scraper for sandbox previews (with fully loaded bypass parameters)
 app.post("/api/test-scrape", async (req, res) => {
-  const { url, extractionType, selector, prompt } = req.body;
+  const { 
+    url, 
+    extractionType, 
+    selector, 
+    prompt,
+    jsRendering,
+    userAgentMode,
+    customUserAgent,
+    headersJson,
+    cookieSession,
+    delaySecs,
+    proxyAddress
+  } = req.body;
 
   if (!url) {
     res.status(400).json({ error: "Target URL is required for testing." });
@@ -408,7 +605,15 @@ app.post("/api/test-scrape", async (req, res) => {
 
   try {
     const instruction = extractionType === "selector" ? selector : prompt;
-    const data = await executeScrape(url, extractionType, instruction);
+    const data = await executeScrape(url, extractionType, instruction, {
+      jsRendering,
+      userAgentMode,
+      customUserAgent,
+      headersJson,
+      cookieSession,
+      delaySecs,
+      proxyAddress
+    });
     res.json({ success: true, count: data.length, data });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message || "Scraping query failed." });
@@ -443,42 +648,13 @@ setInterval(() => {
       task.status = "running";
       dbModified = true;
 
-      // Asynchronous run
+      // Asynchronous run via dynamic runner
       (async () => {
-        const runId = Date.now().toString();
-        const runAt = new Date().toISOString();
-        let results: any[] = [];
-        let status: "success" | "failed" = "success";
-        let errmsg: string | null = null;
-
         try {
-          const instr = task.extractionType === "selector" ? (task.selector || "") : (task.prompt || "");
-          results = await executeScrape(task.url, task.extractionType, instr);
-        } catch (err: any) {
-          status = "failed";
-          errmsg = err.message || "Auto-run failure.";
+          await runScrapingTask(task.id);
+        } catch (err) {
+          console.error(`[Scheduler Async Error] Task ${task.name} auto-run failed:`, err);
         }
-
-        const runDb = loadDatabase();
-        const runTaskIdx = runDb.tasks.findIndex((t) => t.id === task.id);
-        if (runTaskIdx !== -1) {
-          runDb.tasks[runTaskIdx].status = status === "success" ? "success" : "failed";
-          runDb.tasks[runTaskIdx].lastRunAt = runAt;
-        }
-
-        const newRun: ScrapingRun = {
-          id: runId,
-          taskId: task.id,
-          taskName: task.name,
-          runAt,
-          status,
-          resultsCount: results.length,
-          errorMessage: errmsg,
-          data: results,
-        };
-
-        runDb.runs.push(newRun);
-        saveDatabase(runDb);
       })();
     }
   });

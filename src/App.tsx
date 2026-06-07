@@ -53,6 +53,17 @@ export default function App() {
   const [formError, setFormError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
+  // Advanced anti-bot & automated workflow states
+  const [jsRendering, setJsRendering] = useState(false);
+  const [userAgentMode, setUserAgentMode] = useState<'standard' | 'mobile' | 'googlebot' | 'custom'>("standard");
+  const [customUserAgent, setCustomUserAgent] = useState("");
+  const [headersJson, setHeadersJson] = useState("");
+  const [cookieSession, setCookieSession] = useState("");
+  const [delaySecs, setDelaySecs] = useState<number>(0);
+  const [proxyAddress, setProxyAddress] = useState("");
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [chainTaskId, setChainTaskId] = useState("");
+
   // Run detailed viewer
   const [selectedRun, setSelectedRun] = useState<ScrapingRun | null>(null);
 
@@ -64,6 +75,15 @@ export default function App() {
   const [playResults, setPlayResults] = useState<any[] | null>(null);
   const [playLoading, setPlayLoading] = useState(false);
   const [playError, setPlayError] = useState("");
+
+  // Playground dynamic parameters
+  const [playJsRendering, setPlayJsRendering] = useState(false);
+  const [playUserAgentMode, setPlayUserAgentMode] = useState<'standard' | 'mobile' | 'googlebot' | 'custom'>("standard");
+  const [playCustomUserAgent, setPlayCustomUserAgent] = useState("");
+  const [playHeadersJson, setPlayHeadersJson] = useState("");
+  const [playCookieSession, setPlayCookieSession] = useState("");
+  const [playDelaySecs, setPlayDelaySecs] = useState<number>(0);
+  const [playProxyAddress, setPlayProxyAddress] = useState("");
 
   // Notification Toast state
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
@@ -120,6 +140,18 @@ export default function App() {
     setPrompt("");
     setSchedule("manual");
     setFormError("");
+
+    // Advanced parameters default reset
+    setJsRendering(false);
+    setUserAgentMode("standard");
+    setCustomUserAgent("");
+    setHeadersJson("");
+    setCookieSession("");
+    setDelaySecs(0);
+    setProxyAddress("");
+    setWebhookUrl("");
+    setChainTaskId("");
+
     setIsTaskModalOpen(true);
   };
 
@@ -132,6 +164,18 @@ export default function App() {
     setPrompt(task.prompt || "");
     setSchedule(task.schedule);
     setFormError("");
+
+    // Read saved configuration settings safely
+    setJsRendering(!!task.jsRendering);
+    setUserAgentMode(task.userAgentMode || "standard");
+    setCustomUserAgent(task.customUserAgent || "");
+    setHeadersJson(task.headersJson || "");
+    setCookieSession(task.cookieSession || "");
+    setDelaySecs(task.delaySecs || 0);
+    setProxyAddress(task.proxyAddress || "");
+    setWebhookUrl(task.webhookUrl || "");
+    setChainTaskId(task.chainTaskId || "");
+
     setIsTaskModalOpen(true);
   };
 
@@ -156,6 +200,17 @@ export default function App() {
       selector: extractionType === "selector" ? selector : "",
       prompt: extractionType === "ai" ? prompt : "",
       schedule,
+
+      // Advanced parameters
+      jsRendering,
+      userAgentMode,
+      customUserAgent,
+      headersJson,
+      cookieSession,
+      delaySecs,
+      proxyAddress,
+      webhookUrl,
+      chainTaskId
     };
 
     try {
@@ -270,6 +325,14 @@ export default function App() {
           extractionType: playType,
           selector: playType === "selector" ? playSelector : "",
           prompt: playType === "ai" ? playPrompt : "",
+          
+          jsRendering: playJsRendering,
+          userAgentMode: playUserAgentMode,
+          customUserAgent: playCustomUserAgent,
+          headersJson: playHeadersJson,
+          cookieSession: playCookieSession,
+          delaySecs: playDelaySecs,
+          proxyAddress: playProxyAddress
         }),
       });
 
@@ -939,6 +1002,101 @@ export default function App() {
                     )}
                   </div>
 
+                  {/* Advanced Sandbox Elements */}
+                  <div className="border-t border-slate-150 pt-4 space-y-3 bg-slate-50/50 p-2.5 rounded-lg border">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-blue-600">Sandbox Anti-Bot Tactics</label>
+                    
+                    <div className="flex items-center space-x-2 bg-white border border-slate-150 p-2 rounded-lg shadow-2xs">
+                      <input 
+                        type="checkbox"
+                        id="playJsRendering"
+                        checked={playJsRendering}
+                        onChange={(e) => setPlayJsRendering(e.target.checked)}
+                        className="rounded border-slate-350 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                      />
+                      <label htmlFor="playJsRendering" className="text-xs text-slate-700 font-medium cursor-pointer">
+                        Simulate JS Fluid Rendering
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[9.5px] font-bold text-slate-500 uppercase tracking-wide">UA Signature</label>
+                        <select
+                          value={playUserAgentMode}
+                          onChange={(e) => setPlayUserAgentMode(e.target.value as any)}
+                          className="w-full text-xs border border-slate-200 bg-white rounded-lg p-1.5 focus:border-blue-500 outline-none"
+                        >
+                          <option value="standard">Standard Chrome</option>
+                          <option value="mobile">iOS Safari</option>
+                          <option value="googlebot">Googlebot</option>
+                          <option value="custom">Custom UA</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[9.5px] font-bold text-slate-500 uppercase tracking-wide">Polite Delay (Sec)</label>
+                        <input 
+                          type="number"
+                          placeholder="0"
+                          min={0}
+                          value={playDelaySecs}
+                          onChange={(e) => setPlayDelaySecs(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-full text-xs border border-slate-200 bg-white rounded-lg p-1.5 focus:border-blue-500 outline-none font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {playUserAgentMode === "custom" && (
+                      <div>
+                        <label className="block text-[9.5px] font-bold text-slate-500 uppercase">Custom UA String</label>
+                        <input 
+                          type="text"
+                          placeholder="Mozilla/5.0..."
+                          value={playCustomUserAgent}
+                          onChange={(e) => setPlayCustomUserAgent(e.target.value)}
+                          className="w-full text-xs border border-slate-200 bg-white rounded-lg p-1.5 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[9.5px] font-bold text-slate-500 uppercase tracking-wide">Session Cookie</label>
+                        <input 
+                          type="text"
+                          placeholder="session=123..."
+                          value={playCookieSession}
+                          onChange={(e) => setPlayCookieSession(e.target.value)}
+                          className="w-full text-xs border border-slate-200 bg-white rounded-lg p-1.5 focus:border-blue-500 outline-none font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[9.5px] font-bold text-slate-500 uppercase tracking-wide">IP Proxy Tunnel</label>
+                        <input 
+                          type="text"
+                          placeholder="1.2.3.4:80"
+                          value={playProxyAddress}
+                          onChange={(e) => setPlayProxyAddress(e.target.value)}
+                          className="w-full text-xs border border-slate-200 bg-white rounded-lg p-1.5 focus:border-blue-500 outline-none font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[9.5px] font-bold text-slate-500 uppercase tracking-wide">Custom Headers override (JSON)</label>
+                      <textarea
+                        rows={1}
+                        placeholder='{"Referer": "https://google.com"}'
+                        value={playHeadersJson}
+                        onChange={(e) => setPlayHeadersJson(e.target.value)}
+                        className="w-full text-[10.5px] font-mono border border-slate-200 bg-white rounded-lg p-1.5 focus:border-blue-500 outline-none"
+                      ></textarea>
+                    </div>
+
+                  </div>
+
                   <button
                     type="button"
                     onClick={runPlaygroundScrape}
@@ -1100,116 +1258,263 @@ export default function App() {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSaveTask} className="p-6 space-y-4">
+            <form onSubmit={handleSaveTask} className="flex flex-col">
               
-              {formError && (
-                <div className="bg-rose-50 text-rose-800 p-3 rounded-lg flex items-start space-x-2 text-xs font-semibold border border-rose-100">
-                  <AlertCircle size={15} className="shrink-0 mt-0.5" />
-                  <span>{formError}</span>
-                </div>
-              )}
-
-              {/* Task Title */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Crawl Profile Title</label>
-                <input 
-                  type="text"
-                  required
-                  placeholder="e.g. Hacker News Top stories"
-                  value={taskName}
-                  onChange={(e) => setTaskName(e.target.value)}
-                  className="w-full text-xs border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
-              {/* URL Landing Link */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Target Website landing-page Link</label>
-                <input 
-                  type="url"
-                  required
-                  placeholder="e.g. https://news.ycombinator.com"
-                  value={taskUrl}
-                  onChange={(e) => setTaskUrl(e.target.value)}
-                  className="w-full text-xs font-mono border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
-              {/* Schema logic switch */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Parsing Mode Strategy</label>
-                <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-lg">
-                  <button
-                    type="button"
-                    onClick={() => setExtractionType("ai")}
-                    className={`py-1.5 text-xs font-semibold rounded-md flex items-center justify-center space-x-1 cursor-pointer transition-colors ${extractionType === "ai" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"}`}
-                  >
-                    <Sparkles size={11} className="text-violet-500" />
-                    <span>Gemini AI Extraction</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setExtractionType("selector")}
-                    className={`py-1.5 text-xs font-semibold rounded-md flex items-center justify-center space-x-1 cursor-pointer transition-colors ${extractionType === "selector" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"}`}
-                  >
-                    <Code size={11} className="text-emerald-500" />
-                    <span>CSS Selectors tagging</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Detail parameters mapping */}
-              <div>
-                {extractionType === "ai" ? (
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Crawl prompt instructions (Natural Language)</label>
-                    <textarea
-                      rows={3}
-                      required
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      placeholder="e.g. Extract the rank, title, author name, and direct story links into JSON blocks"
-                      className="w-full text-xs border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                    ></textarea>
-                    <p className="text-[10.5px] mt-1 text-slate-505 leading-normal">
-                      Instructions will be evaluated dynamically by Gemini Flash model targeting optimal context efficiency.
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Crawl Row Matching CSS Selectors</label>
-                    <input 
-                      type="text"
-                      required
-                      placeholder="e.g. tr.athing or div.story"
-                      value={selector}
-                      onChange={(e) => setSelector(e.target.value)}
-                      className="w-full text-xs font-mono border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                    />
-                    <p className="text-[10.5px] mt-1 text-slate-505">
-                      Extracts child table rows and subheadings automatically using standard Cheerio selector queries.
-                    </p>
+              {/* Form Content Body (Scrollable for comfortable viewport) */}
+              <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+                {formError && (
+                  <div className="bg-rose-50 text-rose-800 p-3 rounded-lg flex items-start space-x-2 text-xs font-semibold border border-rose-100">
+                    <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                    <span>{formError}</span>
                   </div>
                 )}
+
+                {/* Task Title */}
+                <div>
+                  <label className="block text:[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Crawl Profile Title</label>
+                  <input 
+                    type="text"
+                    required
+                    placeholder="e.g. Hacker News Top stories"
+                    value={taskName}
+                    onChange={(e) => setTaskName(e.target.value)}
+                    className="w-full text-xs border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+
+                {/* URL Landing Link */}
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Target Website Landing-Page Link</label>
+                  <input 
+                    type="url"
+                    required
+                    placeholder="e.g. https://news.ycombinator.com"
+                    value={taskUrl}
+                    onChange={(e) => setTaskUrl(e.target.value)}
+                    className="w-full text-xs font-mono border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+
+                {/* Schema logic switch */}
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Parsing Mode Strategy</label>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setExtractionType("ai")}
+                      className={`py-1.5 text-xs font-semibold rounded-md flex items-center justify-center space-x-1 cursor-pointer transition-colors ${extractionType === "ai" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"}`}
+                    >
+                      <Sparkles size={11} className="text-violet-500" />
+                      <span>Gemini AI Extraction</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExtractionType("selector")}
+                      className={`py-1.5 text-xs font-semibold rounded-md flex items-center justify-center space-x-1 cursor-pointer transition-colors ${extractionType === "selector" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"}`}
+                    >
+                      <Code size={11} className="text-emerald-500" />
+                      <span>CSS Selectors Tagging</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Detail parameters mapping */}
+                <div>
+                  {extractionType === "ai" ? (
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Crawl prompt instructions (Natural Language)</label>
+                      <textarea
+                        rows={3}
+                        required
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="e.g. Extract the rank, title, author name, and direct story links into JSON blocks"
+                        className="w-full text-xs border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                      ></textarea>
+                      <p className="text-[10.5px] mt-1 text-slate-505 leading-normal">
+                        Instructions will be evaluated dynamically by Gemini Flash model targeting optimal context efficiency.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Crawl Row Matching CSS Selectors</label>
+                      <input 
+                        type="text"
+                        required
+                        placeholder="e.g. tr.athing or div.story"
+                        value={selector}
+                        onChange={(e) => setSelector(e.target.value)}
+                        className="w-full text-xs font-mono border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                      />
+                      <p className="text-[10.5px] mt-1 text-slate-505">
+                        Extracts child table rows and subheadings automatically using standard Cheerio selector queries.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Cron Schedules setup */}
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Automatic Scraping Frequency Interval</label>
+                  <select
+                    value={schedule}
+                    onChange={(e) => setSchedule(e.target.value as ScheduleInterval)}
+                    className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-medium"
+                  >
+                    <option value="manual">Manual Execution (On demand only)</option>
+                    <option value="hourly">Hourly execution (Automated schedule)</option>
+                    <option value="daily">Daily execution (Every 24 hours)</option>
+                    <option value="weekly">Weekly execution (Every 7 days)</option>
+                  </select>
+                </div>
+
+                {/* ADVANCED BYPASS & CONTROL ADVOCACY */}
+                <div className="border-t border-slate-150 pt-4 space-y-4">
+                  <h4 className="text-xs font-bold text-slate-950 tracking-wider uppercase flex items-center gap-1.5 text-blue-600">
+                    <Sliders size={12} className="text-blue-500" />
+                    <span>⚙ Advanced & Anti-Bot Bypass Settings</span>
+                  </h4>
+
+                  {/* JS Hydrated Simulator & Politeness Delay */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200 p-2.5 rounded-lg">
+                      <input 
+                        type="checkbox"
+                        id="jsRendering"
+                        checked={jsRendering}
+                        onChange={(e) => setJsRendering(e.target.checked)}
+                        className="rounded border-slate-350 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                      />
+                      <label htmlFor="jsRendering" className="text-xs text-slate-700 font-medium cursor-pointer">
+                        Simulate JS Hydrated Rendering
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10.5px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Politeness Delay (Sec)</label>
+                      <input 
+                        type="number"
+                        min={0}
+                        max={60}
+                        placeholder="e.g. 3"
+                        value={delaySecs}
+                        onChange={(e) => setDelaySecs(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full text-xs border border-slate-220 rounded-lg p-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Anti-Bot Header Rotation UA */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-[10.5px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Simulated User Agent Style</label>
+                      <select
+                        value={userAgentMode}
+                        onChange={(e) => setUserAgentMode(e.target.value as any)}
+                        className="w-full text-xs border border-slate-x bg-white rounded-lg p-2.5 focus:border-blue-500 outline-none font-medium"
+                      >
+                        <option value="standard">Chrome Desktop (Standard)</option>
+                        <option value="mobile">Safari Mobile (iOS)</option>
+                        <option value="googlebot">Googlebot Crawler (Search Indexing)</option>
+                        <option value="custom">Custom Signature Text</option>
+                      </select>
+                    </div>
+
+                    {userAgentMode === "custom" && (
+                      <div>
+                        <label className="block text-[10.5px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Custom UA Signature String</label>
+                        <input 
+                          type="text"
+                          placeholder="Mozilla/5.0..."
+                          value={customUserAgent}
+                          onChange={(e) => setCustomUserAgent(e.target.value)}
+                          className="w-full text-xs border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Cookie simulation and Proxy Tunneling info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-[10.5px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Session Cookie Payload</label>
+                      <input 
+                        type="text"
+                        placeholder="e.g. session=abc1234; path=/"
+                        value={cookieSession}
+                        onChange={(e) => setCookieSession(e.target.value)}
+                        className="w-full text-xs border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 outline-none font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10.5px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Simulated IP Proxy Tunnel</label>
+                      <input 
+                        type="text"
+                        placeholder="e.g. 192.168.1.100:8080"
+                        value={proxyAddress}
+                        onChange={(e) => setProxyAddress(e.target.value)}
+                        className="w-full text-xs border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Advanced headers override JSON */}
+                  <div>
+                    <label className="block text-[10.5px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Custom Headers Payload (JSON object)</label>
+                    <textarea
+                      rows={1}
+                      placeholder='e.g. {"Authorization": "Bearer abc", "Referer": "https://google.com"}'
+                      value={headersJson}
+                      onChange={(e) => setHeadersJson(e.target.value)}
+                      className="w-full text-[11px] font-mono border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                    ></textarea>
+                  </div>
+
+                  {/* WORKFLOW AUTOMATION PIPELINES */}
+                  <h4 className="text-xs font-bold text-slate-905 tracking-wider uppercase flex items-center gap-1.5 text-blue-600 pt-3 border-t border-slate-100">
+                    <Layers size={12} className="text-blue-500" />
+                    <span>⚡ Workflow Automation Actions</span>
+                  </h4>
+
+                  {/* Webhook Endpoint triggers and Chaining */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-[10.5px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Webhook target HTTP POST Callback</label>
+                      <input 
+                        type="url"
+                        placeholder="e.g. https://api.mysite.com/endpoints/webhook"
+                        value={webhookUrl}
+                        onChange={(e) => setWebhookUrl(e.target.value)}
+                        className="w-full text-xs border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 outline-none font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10.5px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Sequential Chaining Trigger</label>
+                      <select
+                        value={chainTaskId}
+                        onChange={(e) => setChainTaskId(e.target.value)}
+                        className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2.5 focus:border-blue-500 outline-none font-medium"
+                      >
+                        <option value="">-- No secondary task trigger --</option>
+                        {tasks
+                          .filter(t => t.id !== editingTask?.id)
+                          .map(t => (
+                            <option key={t.id} value={t.id}>
+                              Launch "{t.name}" next
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  </div>
+
+                </div>
+
               </div>
 
-              {/* Cron Schedules setup */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Automatic Scraping Frequency Interval</label>
-                <select
-                  value={schedule}
-                  onChange={(e) => setSchedule(e.target.value as ScheduleInterval)}
-                  className="w-full text-xs border border-slate-220 bg-white rounded-lg p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-medium"
-                >
-                  <option value="manual">Manual Execution (On demand only)</option>
-                  <option value="hourly">Hourly execution (Automated schedule)</option>
-                  <option value="daily">Daily execution (Every 24 hours)</option>
-                  <option value="weekly">Weekly execution (Every 7 days)</option>
-                </select>
-              </div>
-
-              {/* Bottom modal controls */}
-              <div className="pt-4 border-t border-slate-150 flex items-center justify-end space-x-2.5">
+              {/* Bottom Sticky modal controls */}
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-150 flex items-center justify-end space-x-2.5">
                 <button
                   type="button"
                   onClick={() => setIsTaskModalOpen(false)}
