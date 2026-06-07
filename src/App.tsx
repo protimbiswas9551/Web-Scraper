@@ -28,8 +28,20 @@ import {
   Layers,
   Mail,
   Cloud,
-  Lock
+  Lock,
+  TrendingUp,
+  Activity
 } from "lucide-react";
+import { 
+  ResponsiveContainer, 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip as RechartsTooltip, 
+  Legend as RechartsLegend 
+} from "recharts";
 import { ScrapingTask, ScrapingRun, ExtractionType, ScheduleInterval } from "./types";
 import { StatsSection } from "./components/StatsSection";
 import { TaskCard } from "./components/TaskCard";
@@ -893,7 +905,178 @@ export default function App() {
               {/* Comprehensive Spreadsheet Layout Grid for Captured Raw Table Data */}
               <div className="lg:col-span-3 space-y-4">
                 {selectedRun ? (
-                  <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden flex flex-col min-h-[500px]">
+                  <>
+                    {/* Recharts trend visualization block */}
+                    {(() => {
+                      const taskRuns = runs.filter((r) => r.taskId === selectedRun.taskId);
+                      const sortedSuccessfulRuns = [...taskRuns]
+                        .filter((r) => r.status === "success")
+                        .sort((a, b) => new Date(a.runAt).getTime() - new Date(b.runAt).getTime());
+
+                      const chartData = sortedSuccessfulRuns.map((r, index) => {
+                        const formattedTime = new Date(r.runAt).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                        return {
+                          name: formattedTime,
+                          "Rows Collected": r.resultsCount,
+                          "Crawl ID": `#${r.id.substring(Math.max(0, r.id.length - 4))}`
+                        };
+                      });
+
+                      const totalRuns = taskRuns.length;
+                      const successfulRunsCount = sortedSuccessfulRuns.length;
+                      const failedRunsCount = taskRuns.filter((r) => r.status === "failed").length;
+
+                      const counts = sortedSuccessfulRuns.map((r) => r.resultsCount);
+                      const minCount = counts.length > 0 ? Math.min(...counts) : 0;
+                      const maxCount = counts.length > 0 ? Math.max(...counts) : 0;
+                      const latestCount = counts.length > 0 ? counts[counts.length - 1] : 0;
+                      const firstCount = counts.length > 0 ? counts[0] : 0;
+
+                      const averageCount = counts.length > 0
+                        ? Math.round(counts.reduce((sum, v) => sum + v, 0) / counts.length)
+                        : 0;
+
+                      // Identify anomalous runs: e.g. runs where crawled count is 0 or deviates from average by > 60%
+                      const anomalies = taskRuns.filter(r => {
+                        if (r.status === "failed") return true;
+                        if (r.status === "success" && r.resultsCount === 0) return true;
+                        if (averageCount > 0 && r.status === "success" && Math.abs(r.resultsCount - averageCount) / averageCount > 0.6) return true;
+                        return false;
+                      });
+
+                      const growthValueText = counts.length > 1
+                        ? latestCount >= firstCount 
+                          ? `+${Math.round(((latestCount - firstCount) / (firstCount || 1)) * 100)}% growth`
+                          : `${Math.round(((latestCount - firstCount) / (firstCount || 1)) * 100)}% decline`
+                        : "Baseline established";
+
+                      return (
+                        <div className="bg-white border border-slate-200 rounded-xl shadow-xs p-5 space-y-4 mb-6">
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <TrendingUp size={16} className="text-blue-600" />
+                                <h3 className="font-bold text-slate-900 text-sm">Harvest Trend & Historical Growth Analysis</h3>
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                Tracking scraped payload yields across <b>{totalRuns}</b> system runs for <b>"{selectedRun.taskName}"</b>
+                              </p>
+                            </div>
+                            <div className="flex gap-2 text-[10.5px]">
+                              <span className="bg-slate-50 text-slate-600 px-2 py-0.5 rounded border border-slate-200 text-[10px] font-medium">
+                                Total runs: <b className="font-semibold text-slate-800">{totalRuns}</b>
+                              </span>
+                              <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-150 text-[10px] font-medium">
+                                Successful: <b className="font-semibold text-slate-800">{successfulRunsCount}</b>
+                              </span>
+                              {failedRunsCount > 0 && (
+                                <span className="bg-rose-50 text-rose-700 px-2 py-0.5 rounded border border-rose-150 text-[10px] font-medium">
+                                  Failed: <b className="font-semibold text-slate-800">{failedRunsCount}</b>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                              <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Latest Harvest</span>
+                              <div className="flex items-baseline gap-1.5 mt-1">
+                                <span className="text-lg font-extrabold text-slate-900">{latestCount}</span>
+                                <span className="text-[10px] text-slate-500 font-mono">rows</span>
+                              </div>
+                              <span className="text-[9px] text-slate-400 block mt-0.5">{growthValueText}</span>
+                            </div>
+
+                            <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                              <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Average Yield</span>
+                              <div className="flex items-baseline gap-1.5 mt-1">
+                                <span className="text-lg font-extrabold text-slate-900">{averageCount}</span>
+                                <span className="text-[10px] text-slate-500 font-mono">rows</span>
+                              </div>
+                              <span className="text-[9px] text-slate-400 block mt-0.5">Overall runs index</span>
+                            </div>
+
+                            <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                              <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Min / Max Range</span>
+                              <div className="flex items-baseline gap-1 mt-1">
+                                <span className="text-base font-extrabold text-slate-900">{minCount}</span>
+                                <span className="text-[10px] text-slate-400 mx-0.5">to</span>
+                                <span className="text-base font-extrabold text-slate-900">{maxCount}</span>
+                              </div>
+                              <span className="text-[9px] text-slate-400 block mt-0.5 font-sans">Spread of harvested records</span>
+                            </div>
+
+                            <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                              <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Detected Anomalies</span>
+                              <div className="flex items-baseline gap-1.5 mt-1">
+                                <span className={`text-lg font-extrabold ${anomalies.length > 0 ? "text-amber-600 animate-pulse" : "text-emerald-600"}`}>
+                                  {anomalies.length}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-mono">events</span>
+                              </div>
+                              <span className="text-[9px] text-slate-400 block mt-0.5 font-sans">Failed/empty/irregular runs</span>
+                            </div>
+                          </div>
+
+                          <div className="w-full h-[220px] pt-2">
+                            {sortedSuccessfulRuns.length < 2 ? (
+                              <div className="w-full h-full bg-slate-50/50 rounded-lg border border-dashed border-slate-200 flex flex-col items-center justify-center p-6 text-center">
+                                <Activity className="text-slate-400 mb-2" size={24} />
+                                <h4 className="text-xs font-bold text-slate-700">Trend Timeline Data Pending</h4>
+                                <p className="text-[11px] text-slate-500 max-w-sm mt-1 leading-normal">
+                                  Currently, there are {sortedSuccessfulRuns.length === 1 ? "only 1 successful run" : "no successful runs"} recorded for this task. Run this target scraper again to construct a multi-point growth timeline!
+                                </p>
+                              </div>
+                            ) : (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart
+                                  data={chartData}
+                                  margin={{ top: 5, right: 15, left: -20, bottom: 5 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                  <XAxis 
+                                    dataKey="name" 
+                                    tick={{ fontSize: 9 }} 
+                                    stroke="#94a3b8" 
+                                  />
+                                  <YAxis 
+                                    tick={{ fontSize: 9 }} 
+                                    stroke="#94a3b8" 
+                                    allowDecimals={false}
+                                  />
+                                  <RechartsTooltip 
+                                    contentStyle={{ 
+                                      backgroundColor: "#0f172a", 
+                                      border: "none", 
+                                      borderRadius: "8px", 
+                                      color: "#fff",
+                                      fontSize: "11px",
+                                    }}
+                                    itemStyle={{ color: "#38bdf8" }}
+                                    cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '3 3' }}
+                                  />
+                                  <Line 
+                                    type="monotone" 
+                                    dataKey="Rows Collected" 
+                                    stroke="#2563eb" 
+                                    strokeWidth={2}
+                                    activeDot={{ r: 6, strokeWidth: 0, fill: "#1d4ed8" }}
+                                    dot={{ r: 3.5, strokeWidth: 1.5, fill: "#fff", stroke: "#2563eb" }}
+                                  />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden flex flex-col min-h-[500px]">
                     
                     {/* Header Panel */}
                     <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -1015,6 +1198,7 @@ export default function App() {
                     )}
 
                   </div>
+                </>
                 ) : (
                   <div className="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-xs">
                     <FileSpreadsheet size={44} className="text-slate-300 mx-auto mb-3" />
