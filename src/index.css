@@ -31,3 +31,145 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #d4d4d8;
 }
+
+/* ======================================================== */
+/* SEAMLESS GLOBAL DARK THEME CONFIGURATIONS (HTML.DARK)    */
+/* ======================================================== */
+html.dark, .dark {
+  color-scheme: dark;
+}
+
+/* Base Body overrides */
+html.dark body {
+  background-color: #0b0f19 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Main background content overrides */
+html.dark main {
+  background-color: #0b0f19 !important;
+}
+
+/* Sidebar styling holds dark but content header transitions */
+html.dark #app_header {
+  background-color: #0e1626 !important;
+  border-bottom-color: #1a2436 !important;
+}
+
+html.dark #app_header h1 {
+  color: #ffffff !important;
+}
+
+html.dark #app_header input {
+  background-color: #172033 !important;
+  color: #f1f5f9 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Cards & sections with bg-white overridden perfectly */
+html.dark .bg-white {
+  background-color: #111a2e !important;
+}
+
+html.dark .bg-slate-50,
+html.dark .bg-zinc-50,
+html.dark .bg-slate-100,
+html.dark .bg-zinc-100 {
+  background-color: #17223b !important;
+}
+
+html.dark .bg-zinc-50\/50 {
+  background-color: #131c31 !important;
+}
+
+/* Borders overrides */
+html.dark .border,
+html.dark .border-slate-100,
+html.dark .border-slate-150,
+html.dark .border-slate-200,
+html.dark .border-slate-220,
+html.dark .border-slate-250,
+html.dark .border-slate-300,
+html.dark .border-zinc-100,
+html.dark .border-zinc-150,
+html.dark .border-zinc-200,
+html.dark .border-zinc-220,
+html.dark .border-zinc-300 {
+  border-color: #1e2d4a !important;
+}
+
+html.dark .divide-slate-150 > * + *,
+html.dark .divide-y > * + * {
+  border-color: #1e2d4a !important;
+}
+
+/* Text elements styling */
+html.dark .text-slate-900,
+html.dark .text-slate-950,
+html.dark .text-slate-800,
+html.dark .text-slate-700,
+html.dark .text-zinc-900,
+html.dark .text-zinc-950,
+html.dark .text-zinc-800,
+html.dark .text-zinc-700 {
+  color: #f1f5f9 !important;
+}
+
+html.dark .text-slate-650,
+html.dark .text-slate-600,
+html.dark .text-slate-500,
+html.dark .text-zinc-650,
+html.dark .text-zinc-500 {
+  color: #94a3b8 !important;
+}
+
+html.dark .text-slate-400,
+html.dark .text-slate-405,
+html.dark .text-zinc-400,
+html.dark .text-zinc-405 {
+  color: #64748b !important;
+}
+
+/* Interactive select and input elements */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #17223b !important;
+  color: #f1f5f9 !important;
+  border-color: #243556 !important;
+}
+
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  border-color: #2563eb !important;
+}
+
+html.dark input::placeholder {
+  color: #64748b !important;
+}
+
+/* Modal backgrounds */
+html.dark .bg-slate-950\/45 {
+  background-color: rgba(2, 6, 23, 0.7) !important;
+}
+
+/* Recharts trend visualization dark mode fixes */
+html.dark .recharts-cartesian-grid line {
+  stroke: #1e2d4a !important;
+}
+
+html.dark .recharts-text {
+  fill: #94a3b8 !important;
+}
+
+/* Scrollbar tweaks for dark theme */
+html.dark ::-webkit-scrollbar-thumb {
+  background: #1e2d4a;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #25395c;
+}
+

@@ -31,7 +31,9 @@ import {
   Cloud,
   Lock,
   TrendingUp,
-  Activity
+  Activity,
+  Sun,
+  Moon
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
@@ -130,6 +132,27 @@ export default function App() {
 
   // Notification Toast state
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+
+  // Dark mode theme state managed persistently with local storage
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem("scrapeflow_theme") === "dark";
+  });
+
+  // Sync state to DOM element
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("scrapeflow_theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("scrapeflow_theme", "light");
+    }
+  }, [darkMode]);
+
+  const toggleDarkMode = () => {
+    setDarkMode(prev => !prev);
+    // Silent notification for theme switch to keep UX professional
+  };
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type });
@@ -564,6 +587,35 @@ export default function App() {
             <span className="opacity-95 text-lg">✦</span> Live Playground
           </button>
         </nav>
+
+        {/* Global Dark Mode / Light Theme Appearance Toggle */}
+        <div className="px-4 py-3 border-t border-slate-800/60">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-1.5 select-none">Appearance</p>
+          <button
+            type="button"
+            onClick={toggleDarkMode}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-150 cursor-pointer"
+            title="Toggle theme mode"
+          >
+            <div className="flex items-center gap-2.5">
+              {darkMode ? (
+                <Sun size={14} className="text-amber-400 animate-pulse" />
+              ) : (
+                <Moon size={14} className="text-indigo-400" />
+              )}
+              <span className="font-medium">{darkMode ? "Light Theme" : "Dark Theme"}</span>
+            </div>
+            
+            {/* Elegant slider switch */}
+            <div className={`w-8 h-4.5 rounded-full p-0.5 transition-colors duration-250 flex items-center shrink-0 ${
+              darkMode ? "bg-blue-600" : "bg-slate-700"
+            }`}>
+              <div className={`w-3.5 h-3.5 rounded-full bg-white shadow-xs transition-transform duration-250 transform ${
+                darkMode ? "translate-x-3.5" : "translate-x-0"
+              }`} />
+            </div>
+          </button>
+        </div>
 
         {/* Dynamic usage statistics strictly based on harvest collection */}
         <div className="p-5 border-t border-slate-800">
