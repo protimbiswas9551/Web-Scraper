@@ -16,15 +16,25 @@ const PORT = 3000;
 
 app.use(express.json({ limit: "15mb" }));
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      "User-Agent": "aistudio-build",
-    },
-  },
-});
+// Lazy initialization of Gemini Client
+let googleGenAIInstance: GoogleGenAI | null = null;
+function getGeminiClient(): GoogleGenAI {
+  if (!googleGenAIInstance) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY environment variable is required but not set. Please set it in Settings -> Secrets.");
+    }
+    googleGenAIInstance = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
+  }
+  return googleGenAIInstance;
+}
 
 // Helper: Read/Write Database
 function loadDatabase(): { tasks: ScrapingTask[]; runs: ScrapingRun[] } {
@@ -176,7 +186,7 @@ function cheerioExtract(html: string, selector: string): any[] {
 async function geminiExtract(html: string, prompt: string): Promise<any[]> {
   const cleanHtml = cleanHtmlContent(html);
   
-  const response = await ai.models.generateContent({
+  const response = await getGeminiClient().models.generateContent({
     model: "gemini-3.5-flash",
     contents: `You are an expert web scraper. Extract a cleanly structured JSON database of details from this HTML snippet according to instructions:
     
