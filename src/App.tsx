@@ -21,6 +21,7 @@ import {
   ChevronRight, 
   Info,
   Check,
+  Copy,
   RefreshCw,
   Clock,
   Sliders,
@@ -101,6 +102,13 @@ export default function App() {
 
   // Run detailed viewer
   const [selectedRun, setSelectedRun] = useState<ScrapingRun | null>(null);
+
+  // Export Preview Modal states
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [previewRun, setPreviewRun] = useState<ScrapingRun | null>(null);
+  const [previewFormat, setPreviewFormat] = useState<"csv" | "json">("csv");
+  const [previewCopied, setPreviewCopied] = useState(false);
+  const [previewSearchQuery, setPreviewSearchQuery] = useState("");
 
   // Playground / Sandbox state
   const [playUrl, setPlayUrl] = useState("http://books.toscrape.com");
@@ -448,15 +456,22 @@ export default function App() {
       showToast("Cannot download empty database run.", "info");
       return;
     }
+    setPreviewRun(run);
+    setPreviewFormat(format);
+    setIsPreviewModalOpen(true);
+    setPreviewCopied(false);
+    setPreviewSearchQuery("");
+  };
 
+  const triggerDirectDownload = (run: ScrapingRun, format: "csv" | "json") => {
     if (format === "csv") {
       const csvStr = convertJsonToCsv(run.data);
       downloadFile(csvStr, `${run.taskName.replace(/\s+/g, "_")}_extracted.csv`, "text/csv;charset=utf-8;");
-      showToast("CSV dataset harvested successfully!");
+      showToast("CSV dataset downloaded successfully!");
     } else {
       const jsonStr = JSON.stringify(run.data, null, 2);
       downloadFile(jsonStr, `${run.taskName.replace(/\s+/g, "_")}_extracted.json`, "application/json;charset=utf-8;");
-      showToast("JSON dataset exported successfully!");
+      showToast("JSON dataset downloaded successfully!");
     }
   };
 
@@ -2073,6 +2088,360 @@ export default function App() {
               </div>
 
             </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* FILE DOWNLOAD EXPORT PREVIEW & SCHEMA VALIDATION MODAL     */}
+      {/* ======================================================== */}
+      {isPreviewModalOpen && previewRun && (
+        <div className="fixed inset-0 bg-slate-950/45 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden animate-slide-up">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-150 flex items-center justify-between bg-slate-50">
+              <div>
+                <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                  <FileSpreadsheet className="text-blue-600" size={18} />
+                  <span>Dataset Format & Schema Verification</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Verify headers, schema data types, and file outputs before downloading. Task Name: <strong className="font-semibold text-slate-700">{previewRun.taskName}</strong>
+                </p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsPreviewModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 hover:bg-slate-200 p-1.5 rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Content Split Panel */}
+            <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0">
+              
+              {/* Left Column: Schema Analysis & File Meta indicators (35% width, lg:col-span-4) */}
+              <div className="lg:col-span-4 border-r border-slate-200 p-5 space-y-4 overflow-y-auto bg-slate-50/50">
+                
+                {/* File format switcher tab buttons */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-405 mb-2">Export Format Previews</label>
+                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-200/60 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewFormat("csv");
+                        setPreviewCopied(false);
+                      }}
+                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                        previewFormat === "csv" 
+                          ? "bg-white text-slate-900 shadow-sm" 
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      <FileSpreadsheet size={13} className={previewFormat === "csv" ? "text-emerald-500" : "text-slate-400"} />
+                      Row Column CSV
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewFormat("json");
+                        setPreviewCopied(false);
+                      }}
+                      className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                        previewFormat === "json" 
+                          ? "bg-white text-slate-900 shadow-sm" 
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      <FileJson size={13} className={previewFormat === "json" ? "text-violet-500" : "text-slate-400"} />
+                      Structured JSON
+                    </button>
+                  </div>
+                </div>
+
+                {/* File Statistics Info */}
+                <div className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+                  <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-1.5">File Metadata Checklist</h4>
+                  
+                  {(() => {
+                    const rowCount = previewRun.data?.length || 0;
+                    const jsonString = JSON.stringify(previewRun.data, null, 2);
+                    const csvString = convertJsonToCsv(previewRun.data || []);
+                    const currentText = previewFormat === "csv" ? csvString : jsonString;
+                    const charCount = currentText.length;
+                    
+                    // Simple size estimator
+                    let sizeText = "0 B";
+                    if (charCount < 1024) sizeText = `${charCount} Bytes`;
+                    else if (charCount < 1024 * 1024) sizeText = `${(charCount / 1024).toFixed(2)} KB`;
+                    else sizeText = `${(charCount / (1024 * 1024)).toFixed(2)} MB`;
+
+                    return (
+                      <div className="grid grid-cols-2 gap-3 text-[11px]">
+                        <div>
+                          <span className="text-slate-400 font-medium block">Total rows:</span>
+                          <span className="font-semibold text-slate-800 text-xs">{rowCount} records</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 font-medium block">Estimated Size:</span>
+                          <span className="font-semibold text-slate-800 text-xs">{sizeText}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 font-medium block">Format:</span>
+                          <span className="font-semibold text-slate-800 text-xs font-mono uppercase text-blue-600">.{previewFormat}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 font-medium block">Filename estimate:</span>
+                          <span className="font-mono text-[10px] truncate max-w-full text-slate-700 block mt-0.5">
+                            {previewRun.taskName.replace(/\s+/g, "_")}_extracted.{previewFormat}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Schema Headers Checklist & Types Analysis */}
+                <div className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-2.5 flex-1 select-none">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                    <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">Scrape Schema Definition</h4>
+                    <span className="bg-slate-100 text-slate-700 rounded px-1.5 py-0.5 font-mono text-[9px]">
+                      {previewRun.data && previewRun.data.length > 0 ? Object.keys(previewRun.data[0]).length : 0} Columns
+                    </span>
+                  </div>
+
+                  {(() => {
+                    if (!previewRun.data || previewRun.data.length === 0) {
+                      return <p className="text-[11px] text-slate-500 italic">No structured data found.</p>;
+                    }
+                    const sampleObj = previewRun.data[0];
+                    const columns = Object.keys(sampleObj);
+
+                    return (
+                      <div className="space-y-2">
+                        <p className="text-[10px] text-slate-400 leading-normal">
+                          Detected active scrapers fields from the first entry record. Verify columns structure:
+                        </p>
+                        <div className="space-y-1.5 max-h-[180px] overflow-y-auto pr-1">
+                          {columns.map((col) => {
+                            const sampleValue = sampleObj[col];
+                            let typeText = "string";
+                            if (sampleValue === null || sampleValue === undefined) typeText = "nullable";
+                            else if (typeof sampleValue === "object") typeText = Array.isArray(sampleValue) ? "list/array" : "object";
+                            else typeText = typeof sampleValue;
+
+                            return (
+                              <div key={col} className="bg-slate-50 rounded-lg p-2 border border-slate-150 flex items-center justify-between text-[11px]">
+                                <div className="truncate pr-2">
+                                  <span className="font-mono text-[11px] text-slate-800 font-semibold">{col}</span>
+                                </div>
+                                <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0 uppercase tracking-wide ${
+                                  typeText === "number" ? "bg-cyan-50 text-cyan-700 border border-cyan-150" :
+                                  typeText === "boolean" ? "bg-purple-50 text-purple-700 border border-purple-150" :
+                                  typeText === "list/array" ? "bg-indigo-50 text-indigo-700 border border-indigo-150" :
+                                  typeText === "nullable" ? "bg-amber-50 text-amber-700 border border-amber-150" :
+                                  "bg-slate-100 text-slate-700 border border-slate-200"
+                                }`}>
+                                  {typeText}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Verification Notice */}
+                <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 flex gap-2">
+                  <Info className="text-blue-500 shrink-0 mt-0.5" size={13} />
+                  <p className="text-[10.5px] text-blue-700 leading-normal">
+                    This wizard lets you analyze the file layout and schema compatibility for imports into BI tools (PowerBI, Tableau, Excel) or custom scripting models.
+                  </p>
+                </div>
+
+              </div>
+
+              {/* Right Column: Code-like raw text viewport with searchable and copy support (65% width, lg:col-span-8) */}
+              <div className="lg:col-span-8 flex flex-col p-5 bg-slate-900 border-t lg:border-t-0 text-slate-300 overflow-hidden h-full">
+                
+                {/* Search & Code Options Toolbar */}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-3 gap-3 shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <Code size={13} className="text-violet-400" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-sans">
+                      Formatted {previewFormat === "csv" ? ".csv File Payload Preview" : ".json Output Stream"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" size={10} />
+                      <input 
+                        type="text" 
+                        placeholder="Filter rows/text..."
+                        value={previewSearchQuery}
+                        onChange={(e) => setPreviewSearchQuery(e.target.value)}
+                        className="bg-slate-950/80 text-[10.5px] border border-slate-800/80 rounded-lg py-1 pl-7 pr-2.5 focus:border-slate-600 outline-none w-36 font-sans text-slate-100"
+                      />
+                    </div>
+                    {previewSearchQuery && (
+                      <button 
+                        type="button"
+                        onClick={() => setPreviewSearchQuery("")}
+                        className="text-[10px] text-slate-400 hover:text-slate-100 underline decoration-dotted cursor-pointer"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actual code display area */}
+                <div className="flex-1 bg-slate-950 border border-slate-800/80 rounded-xl p-4 font-mono text-[11px] overflow-auto leading-relaxed custom-scrollbar flex flex-col min-h-0">
+                  {(() => {
+                    const rawData = previewRun.data || [];
+                    const isCsv = previewFormat === "csv";
+                    
+                    let contentString = "";
+                    if (isCsv) {
+                      contentString = convertJsonToCsv(rawData);
+                    } else {
+                      contentString = JSON.stringify(rawData, null, 2);
+                    }
+
+                    // Process preview lines
+                    let lines = contentString.split("\n");
+                    const totalLinesCount = lines.length;
+
+                    // Apply search filter if query exists
+                    if (previewSearchQuery) {
+                      const q = previewSearchQuery.toLowerCase();
+                      // Keep header if csv
+                      if (isCsv && lines.length > 0) {
+                        const header = lines[0];
+                        const matched = lines.slice(1).filter(line => line.toLowerCase().includes(q));
+                        lines = [header, ...matched];
+                      } else {
+                        lines = lines.filter(line => line.toLowerCase().includes(q));
+                      }
+                    }
+
+                    // For performance, display a preview block (e.g. first 75 lines) so the browser doesn't freeze with large files!
+                    const maxDisplayLines = 75;
+                    const displayedLines = lines.slice(0, maxDisplayLines);
+                    const isTruncated = lines.length > maxDisplayLines;
+
+                    if (lines.length === 0 || (isCsv && lines.length === 1 && lines[0] === "")) {
+                      return (
+                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500">
+                          <Search size={22} className="text-slate-600 mb-2 animate-pulse" />
+                          <p>No lines matched your filter text: "{previewSearchQuery}"</p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="flex-1 overflow-x-auto select-text">
+                        <pre className="text-slate-300">
+                          {displayedLines.map((line, idx) => {
+                            // Line number column
+                            const lineNo = idx + 1;
+                            return (
+                              <div key={idx} className="flex hover:bg-slate-900/40 py-0.5">
+                                <span className="text-slate-600 select-none text-right shrink-0 pr-4 border-r border-slate-800/50 w-10 sticky left-0 bg-slate-950">
+                                  {lineNo}
+                                </span>
+                                <span className="pl-4 break-all whitespace-pre text-emerald-400/90 font-medium">
+                                  {line}
+                                </span>
+                              </div>
+                            );
+                          })}
+
+                          {isTruncated && (
+                            <div className="flex py-2 border-t border-slate-800 mt-2 text-slate-500 italic select-none">
+                              <span className="text-slate-600 text-right shrink-0 pr-4 border-r border-slate-800/50 w-10 sticky left-0 bg-slate-950">
+                                ...
+                              </span>
+                              <span className="pl-4">
+                                // Truncated preview: showing {maxDisplayLines} of {totalLinesCount} total lines check. Download the file to view full results!
+                              </span>
+                            </div>
+                          )}
+                        </pre>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Performance note footer */}
+                <div className="mt-2 text-[10px] text-slate-500 text-right select-none font-sans">
+                  * Live browser preview truncated at 75 rows for optimal memory rendering.
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-150 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  const contentString = previewFormat === "csv" 
+                    ? convertJsonToCsv(previewRun.data || []) 
+                    : JSON.stringify(previewRun.data || [], null, 2);
+                  
+                  navigator.clipboard.writeText(contentString);
+                  setPreviewCopied(true);
+                  setTimeout(() => setPreviewCopied(false), 2000);
+                }}
+                className="bg-white border border-slate-250 hover:bg-slate-100 text-slate-700 text-xs font-semibold px-4.5 py-2.5 rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                {previewCopied ? (
+                  <>
+                    <Check className="text-emerald-600 animate-bounce" size={13} />
+                    <span className="text-emerald-700 font-bold">Successfully Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={13} className="text-slate-500" />
+                    <span>Copy to Clipboard</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center space-x-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewModalOpen(false)}
+                  className="border border-slate-250 hover:bg-slate-50 text-slate-800 text-xs font-semibold px-4.5 py-2.5 rounded-lg cursor-pointer"
+                >
+                  Close Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerDirectDownload(previewRun, previewFormat);
+                    setIsPreviewModalOpen(false);
+                  }}
+                  className={`text-white text-xs font-bold px-4.5 py-2.5 rounded-lg cursor-pointer flex items-center space-x-1 shadow-sm ${
+                    previewFormat === "csv" 
+                      ? "bg-emerald-600 hover:bg-emerald-700" 
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }`}
+                >
+                  <Download size={13} />
+                  <span>Download {previewFormat.toUpperCase()} Dataset</span>
+                </button>
+              </div>
+            </div>
 
           </div>
         </div>
