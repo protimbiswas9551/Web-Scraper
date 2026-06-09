@@ -105,6 +105,21 @@ export default function App() {
 
   // Run detailed viewer
   const [selectedRun, setSelectedRun] = useState<ScrapingRun | null>(null);
+  const [runSortOrder, setRunSortOrder] = useState<"newest" | "oldest" | "highest">("newest");
+
+  // Sorted runs for the Harvester Exports list view
+  const sortedRuns = React.useMemo(() => {
+    return [...runs].sort((a, b) => {
+      if (runSortOrder === "newest") {
+        return new Date(b.runAt).getTime() - new Date(a.runAt).getTime();
+      } else if (runSortOrder === "oldest") {
+        return new Date(a.runAt).getTime() - new Date(b.runAt).getTime();
+      } else if (runSortOrder === "highest") {
+        return b.resultsCount - a.resultsCount;
+      }
+      return 0;
+    });
+  }, [runs, runSortOrder]);
 
   // Export Preview Modal states
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
@@ -953,14 +968,30 @@ export default function App() {
               
               {/* Runs List side sidebar */}
               <div className="lg:col-span-1 space-y-4">
-                <h3 className="font-semibold text-slate-900">Saved Datasets</h3>
+                <div className="flex flex-col sm:flex-row lg:flex-col sm:items-center lg:items-stretch justify-between gap-2 pb-1">
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 flex-shrink-0">Saved Datasets</h3>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Sort:</span>
+                    <select
+                      id="dataset_sort_order"
+                      value={runSortOrder}
+                      onChange={(e) => setRunSortOrder(e.target.value as any)}
+                      className="text-[11.5px] font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 outline-none text-slate-600 dark:text-slate-300 w-full cursor-pointer"
+                    >
+                      <option value="newest">Date (Newest)</option>
+                      <option value="oldest">Date (Oldest)</option>
+                      <option value="highest">Result Count (High to Low)</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-150 shadow-xs max-h-[600px] overflow-y-auto">
-                  {runs.length === 0 ? (
+                  {sortedRuns.length === 0 ? (
                     <div className="p-6 text-center text-xs text-slate-500">
                       No datasets successfully collected yet.
                     </div>
                   ) : (
-                    runs.map((r) => (
+                    sortedRuns.map((r) => (
                       <div
                         key={r.id}
                         onClick={() => setSelectedRun(r)}
