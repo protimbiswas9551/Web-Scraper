@@ -81,6 +81,7 @@ export default function App() {
   const [proxyAddress, setProxyAddress] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [chainTaskId, setChainTaskId] = useState("");
+  const [maxRows, setMaxRows] = useState<number | "">("");
 
   // Recurring Email Delivery configuration states
   const [emailDeliveryEnabled, setEmailDeliveryEnabled] = useState(false);
@@ -217,6 +218,7 @@ export default function App() {
     setProxyAddress("");
     setWebhookUrl("");
     setChainTaskId("");
+    setMaxRows("");
 
     // Delivery resets
     setEmailDeliveryEnabled(false);
@@ -260,6 +262,7 @@ export default function App() {
     setProxyAddress(task.proxyAddress || "");
     setWebhookUrl(task.webhookUrl || "");
     setChainTaskId(task.chainTaskId || "");
+    setMaxRows(task.maxRows !== undefined ? task.maxRows : "");
 
     // Load saved delivery parameters
     setEmailDeliveryEnabled(!!task.emailDeliveryEnabled);
@@ -315,6 +318,7 @@ export default function App() {
       proxyAddress,
       webhookUrl,
       chainTaskId,
+      maxRows: maxRows !== "" ? Number(maxRows) : undefined,
 
       // Email notification params
       emailDeliveryEnabled,
@@ -871,9 +875,20 @@ export default function App() {
                                 )}
                               </td>
                               <td className="px-6 py-4">
-                                <span className="bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded uppercase text-[10px] tracking-wide">
-                                  {task.schedule === "manual" ? "manual (on demand)" : task.schedule}
-                                </span>
+                                <div className="space-y-1">
+                                  <span className="bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded uppercase text-[10px] tracking-wide block w-fit">
+                                    {task.schedule === "manual" ? "manual (on demand)" : task.schedule}
+                                  </span>
+                                  {task.maxRows && task.maxRows > 0 ? (
+                                    <span className="text-[10px] text-amber-600 dark:text-amber-400 block font-semibold">
+                                      Limit: {task.maxRows} rows
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
+                                      Limit: None
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-6 py-4">
                                 {task.status === "running" ? (
@@ -1860,6 +1875,21 @@ export default function App() {
                             </option>
                           ))}
                       </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10.5px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Max Rows Limit</label>
+                      <input 
+                        type="number"
+                        min="1"
+                        placeholder="e.g. 50 (Unset for all matching rows)"
+                        value={maxRows}
+                        onChange={(e) => setMaxRows(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-full text-xs border border-slate-220 rounded-lg p-2.5 focus:border-blue-500 outline-none font-mono"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Prevents accidental oversized payloads or high token usage during crawls.
+                      </p>
                     </div>
                   </div>
 

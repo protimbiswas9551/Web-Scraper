@@ -52,6 +52,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             <Calendar size={11} className="mr-1" />
             {getScheduleLabel(task.schedule)}
           </span>
+          {task.maxRows && task.maxRows > 0 && (
+            <span className="inline-flex items-center text-[11px] font-semibold text-amber-750 bg-amber-50 dark:text-amber-400 dark:bg-zinc-800/60 px-2 py-0.5 rounded-full border border-amber-100 dark:border-zinc-700">
+              Limit: {task.maxRows} rows
+            </span>
+          )}
         </div>
         
         {/* Active Schedule Toggle */}

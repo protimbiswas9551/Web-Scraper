@@ -737,6 +737,12 @@ async function runScrapingTask(taskId: string): Promise<ScrapingRun> {
   try {
     const instruction = taskCopy.extractionType === "selector" ? (taskCopy.selector || "") : (taskCopy.prompt || "");
     scrapingResults = await executeScrape(taskCopy.url, taskCopy.extractionType, instruction, taskCopy);
+    
+    // Enforce Max Rows payload limiting constraint
+    if (taskCopy.maxRows && taskCopy.maxRows > 0 && scrapingResults.length > taskCopy.maxRows) {
+      console.log(`[Scraper MaxRows Thread] Task "${taskCopy.name}" results truncated from ${scrapingResults.length} to ${taskCopy.maxRows} items.`);
+      scrapingResults = scrapingResults.slice(0, taskCopy.maxRows);
+    }
   } catch (err: any) {
     scraperStatus = "failed";
     errmsg = err.message || "An unexpected scraper parser error occurred.";
@@ -858,6 +864,7 @@ app.post("/api/tasks", async (req, res) => {
     proxyAddress,
     webhookUrl,
     chainTaskId,
+    maxRows,
 
     // Recurring email settings
     emailDeliveryEnabled,
@@ -916,6 +923,7 @@ app.post("/api/tasks", async (req, res) => {
     proxyAddress: proxyAddress || "",
     webhookUrl: webhookUrl || "",
     chainTaskId: chainTaskId || "",
+    maxRows: maxRows ? Number(maxRows) : undefined,
 
     // Email delivery settings
     emailDeliveryEnabled: !!emailDeliveryEnabled,

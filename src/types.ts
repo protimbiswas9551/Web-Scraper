@@ -27,6 +27,7 @@ export interface ScrapingTask {
   // Automation & Delivery Workflow
   webhookUrl?: string;
   chainTaskId?: string;
+  maxRows?: number;
 
   // Recurring Email Delivery Settings
   emailDeliveryEnabled?: boolean;
