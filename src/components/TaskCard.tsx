@@ -11,6 +11,7 @@ interface TaskCardProps {
   onDelete: (id: string) => void;
   onViewLogs: (taskId: string) => void;
   runsCount: number;
+  successRate?: { percentage: number; total: number } | null;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({
@@ -21,6 +22,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onDelete,
   onViewLogs,
   runsCount,
+  successRate,
 }) => {
   const getScheduleLabel = (sched: string) => {
     switch (sched) {
@@ -31,12 +33,31 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     }
   };
 
+  const getSuccessRateBadge = () => {
+    if (!successRate || successRate.total === 0) return null;
+    const { percentage, total } = successRate;
+    
+    let colorClasses = "text-emerald-700 bg-emerald-50 border-emerald-100 dark:text-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-900";
+    if (percentage < 50) {
+      colorClasses = "text-rose-700 bg-rose-50 border-rose-100 dark:text-rose-400 dark:bg-rose-950/40 dark:border-rose-900";
+    } else if (percentage < 90) {
+      colorClasses = "text-amber-700 bg-amber-50 border-amber-100 dark:text-amber-400 dark:bg-amber-950/40 dark:border-amber-900";
+    }
+
+    return (
+      <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full border ${colorClasses}`} title={`Run success rate of the last ${total} executions`}>
+        <span className="w-1.5 h-1.5 rounded-full bg-current mr-1 animate-pulse shrink-0" />
+        {percentage}% ({total} runs)
+      </span>
+    );
+  };
+
   return (
     <div className={`bg-white border text-zinc-950 rounded-xl shadow-xs overflow-hidden transition-all duration-200 hover:border-zinc-300 relative ${task.status === "running" ? "ring-1 ring-blue-500 border-blue-500" : "border-zinc-200"}`}>
       
       {/* Top Banner indicating Extraction Mode */}
-      <div className="flex border-b border-zinc-100 px-5 py-3.5 items-center justify-between bg-zinc-50/50">
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-wrap border-b border-zinc-100 px-5 py-3.5 items-center justify-between gap-y-2 bg-zinc-50/50">
+        <div className="flex flex-wrap items-center gap-1.5">
           {task.extractionType === "ai" ? (
             <span className="inline-flex items-center text-[11px] font-semibold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-100">
               <Sparkles size={11} className="mr-1" />
@@ -57,6 +78,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               Limit: {task.maxRows} rows
             </span>
           )}
+          {getSuccessRateBadge()}
         </div>
         
         {/* Active Schedule Toggle */}

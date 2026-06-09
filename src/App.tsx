@@ -747,7 +747,18 @@ export default function App() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {filteredTasks.map((task) => {
-                        const runsCount = runs.filter(r => r.taskId === task.id).length;
+                        const taskRuns = runs
+                          .filter(r => r.taskId === task.id)
+                          .sort((a, b) => new Date(b.runAt).getTime() - new Date(a.runAt).getTime());
+                        const runsCount = taskRuns.length;
+                        const lastTenRuns = taskRuns.slice(0, 10);
+                        const successCount = lastTenRuns.filter(r => r.status === "success").length;
+                        const successRate = lastTenRuns.length > 0
+                          ? {
+                              percentage: Math.round((successCount / lastTenRuns.length) * 100),
+                              total: lastTenRuns.length
+                            }
+                          : null;
                         return (
                           <TaskCard 
                             key={task.id}
@@ -758,6 +769,7 @@ export default function App() {
                             onDelete={handleDeleteTask}
                             onViewLogs={handleViewRunsForTask}
                             runsCount={runsCount}
+                            successRate={successRate}
                           />
                         );
                       })}
